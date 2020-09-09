@@ -1,6 +1,5 @@
 from skimage import io
 import cv2
-import pandas
 import numpy as np
 import scipy.optimize as sciOpt
 import matplotlib.pyplot as plt
@@ -18,10 +17,10 @@ def getContours(labelsImg: np.ndarray, minArea: float, maxArea: float) -> List[n
     :return: list of contours
     """
     selectedContours: List[np.ndarray] = []
-    contours, hierarchy = cv2.findContours(labelsImg, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_NONE)
-    contours = [contours[i] for i in range(len(contours)) if hierarchy[0, i, 3] < 0]
-    for cnt in contours:
-        if minArea <= cv2.contourArea(cnt) <= maxArea:
+    binImg = np.uint8(labelsImg > 0)
+    contours, hierarchy = cv2.findContours(binImg, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_NONE)
+    for i, cnt in enumerate(contours):
+        if minArea <= cv2.contourArea(cnt) <= maxArea and hierarchy[0, i, 3] < 0 and hierarchy[0, i, 2] < 0:
             selectedContours.append(cnt)
     return selectedContours
 
@@ -125,36 +124,11 @@ def getDiffOfAngleShift(angleShift: np.ndarray, origPoints: np.ndarray, knownDst
         srcPoints = transformedPoints
         for origInd, associatedInd in enumerate(ind):
             dstPoints[origInd, :] = knownDstPoints[associatedInd]
-
     else:
         dstPoints = knownDstPoints
         for origInd, associatedInd in enumerate(ind):
-            srcPoints[associatedInd] = origInd
+            srcPoints[origInd] = transformedPoints[associatedInd]
 
-    # inverted: bool = False
-    # lessPoints: np.ndarray = transformedPoints
-    # morePoints: np.ndarray = knownDstPoints
-    # if lessPoints.shape[0] > morePoints.shape[0]:
-    #     lessPoints, morePoints = morePoints, lessPoints
-    #     inverted = True
-    #
-    # err, ind = getErrorFromCenters(lessPoints, morePoints)
-    # srcPoints: np.ndarray = lessPoints
-    # counterPoints: np.ndarray = np.zeros_like(lessPoints)
-    #
-    #
-    # if not inverted:
-    #     for origInd, associatedIndex in enumerate(ind):
-    #         counterPoints[origInd, :] = morePoints[associatedIndex, :]
-    # else:
-    #     for origInd, associatedIndex in enumerate(ind):
-    #         counterPoints[origInd, :] = transformedPoints[associatedIndex, :]
-    #
-    # srcPoints: np.ndarray = lessPoints
-    # dstPoints: np.ndarray = counterPoints
-    #
-    # if inverted:
-    #     srcPoints, dstPoints = dstPoints, srcPoints
     err: np.ndarray = (srcPoints - dstPoints).ravel()
 
     return err
@@ -181,7 +155,10 @@ if __name__ == '__main__':
     srcImg: np.ndarray = io.imread(r'w02a_pre_30percent.tif')
     dstImg: np.ndarray = io.imread(r'w02a_water_30percent.tif')
 
-    minParticleArea: float = 2e3
+    srcImg = cv2.medianBlur(srcImg, ksize=9)
+    dstImg = cv2.medianBlur(dstImg, ksize=9)
+
+    minParticleArea: float = 500
     maxParticleArea: float = 1e6
 
     sourceCenters: np.ndarray = getContourCentersFromImage(srcImg, minParticleArea, maxParticleArea)
@@ -189,7 +166,42 @@ if __name__ == '__main__':
     print(f'numSourcePoints {sourceCenters.shape[0]}, numDstPoints {dstCenters.shape[0]}')
     print(f'loading images and getting contours took {time.time()-t0} seconds')
 
-    # t0 = time.time()
-    # angle, shift = findAngleAndShift(sourceCenters, dstCenters)
-    # print(angle, shift)
-    # print(f'getting transform and error took {time.time()-t0} seconds')
+    t0 = time.time()
+    angle, shift = findAngleAndShift(sourceCenters, dstCenters)
+    print(angle, shift)
+    print(f'getting transform and error took {time.time()-t0} seconds')
+
+    transformed: np.ndarray = offSetPoints(sourceCenters, angle, shift)
+    error, indices = getErrorFromCenters(transformed, dstCenters)
+
+    inverted: bool = False
+    if sourceCenters.shape[0] > dstCenters.shape[0]:
+        inverted = True
+
+    for origInd, targetInd in enumerate(indices):
+        if not inverted:
+            x, y = int(round(sourceCenters[origInd, 0])), int(round(sourceCenters[origInd, 1]))
+        else:
+            x, y = int(round(sourceCenters[targetInd, 0])), int(round(sourceCenters[targetInd, 1]))
+
+        cv2.putText(srcImg, str(origInd), (x, y), cv2.FONT_HERSHEY_SIMPLEX, 5.0, (255, 255, 255), thickness=5)
+
+        if not inverted:
+            x, y = int(round(dstCenters[targetInd, 0])), int(round(dstCenters[targetInd, 1]))
+        else:
+            x, y = int(round(dstCenters[origInd, 0])), int(round(dstCenters[origInd, 1]))
+
+        cv2.putText(dstImg, str(origInd), (x, y), cv2.FONT_HERSHEY_SIMPLEX, 5.0, (255, 255, 255), thickness=5)
+
+    # display results
+    plt.subplot(121)
+    plt.title(f'{len(indices)} particles on w02a_pre')
+    plt.imshow(srcImg, cmap='gray')
+    plt.scatter(sourceCenters[:, 0], sourceCenters[:, 1], alpha=0.4)
+
+    plt.subplot(122)
+    plt.title(f'{len(indices)} particles on w02a_water')
+    plt.imshow(dstImg, cmap='gray')
+    plt.scatter(transformed[:, 0], transformed[:, 1], alpha=0.4)
+
+    plt.show()
