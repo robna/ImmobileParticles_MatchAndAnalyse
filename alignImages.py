@@ -46,7 +46,7 @@ def getContourCentersFromImage(image: np.ndarray, minArea: float, maxArea: float
     :param maxArea: max Area of a particle to be considered (px**2)
     :return: shape (N, 2) array of x, y coordinates of centers
     """
-    labelsImg, *others = dh.identify_particles(image)
+    labelsImg, *others = dh.identify_particles(image, high=0.5)
     return getContourCenters(getContours(labelsImg, minArea, maxArea))
 
 
@@ -68,7 +68,7 @@ def offSetPoints(points: np.ndarray, angle: float, shift: np.ndarray) -> np.ndar
     return pointsRot + shift
 
 
-def getErrorFromCenters(lessPoints: np.ndarray, morePoints: np.ndarray) -> Tuple[float, List[int]]:
+def getIndicesAndErrosFromCenters(lessPoints: np.ndarray, morePoints: np.ndarray) -> Tuple[float, List[int]]:
     """
     Calculates the distance of all centers and report the assignment of points in centers2 to points in center1
     :param lessPoints: (N x 2) shape array of x, y coordinates
@@ -80,7 +80,7 @@ def getErrorFromCenters(lessPoints: np.ndarray, morePoints: np.ndarray) -> Tuple
 
     err: float = 0.0
     copyMorePoints: np.ndarray = morePoints.copy()
-    indices: list[int] = []
+    indices: List[int] = []
     i: int = 0
     while i < lessPoints.shape[0]:
         curPoint = lessPoints[i]
@@ -117,7 +117,7 @@ def getDiffOfAngleShift(angleShift: np.ndarray, origPoints: np.ndarray, knownDst
     srcPoints: np.ndarray = np.zeros((lowerNumPoints, 2), dtype=np.float)
     dstPoints: np.ndarray = np.zeros((lowerNumPoints, 2), dtype=np.float)
 
-    err, ind = getErrorFromCenters(transformedPoints, knownDstPoints)
+    err, ind = getIndicesAndErrosFromCenters(transformedPoints, knownDstPoints)
     assert len(ind) == lowerNumPoints
 
     if transformedPoints.shape[0] <= knownDstPoints.shape[0]:
@@ -152,8 +152,11 @@ def findAngleAndShift(points1: np.ndarray, points2: np.ndarray) -> Tuple[float, 
 if __name__ == '__main__':
 
     t0 = time.time()
-    srcImg: np.ndarray = io.imread(r'w02a_pre_30percent.tif')
-    dstImg: np.ndarray = io.imread(r'w02a_water_30percent.tif')
+    # srcImg: np.ndarray = io.imread(r'w02a_pre_30percent.tif')
+    # dstImg: np.ndarray = io.imread(r'w02a_water_30percent.tif')
+
+    srcImg: np.ndarray = io.imread(r'w20_pre_30percent.tif')
+    dstImg: np.ndarray = io.imread(r'w20_HCl_30percent.tif')
 
     srcImg = cv2.medianBlur(srcImg, ksize=9)
     dstImg = cv2.medianBlur(dstImg, ksize=9)
@@ -172,7 +175,7 @@ if __name__ == '__main__':
     print(f'getting transform and error took {time.time()-t0} seconds')
 
     transformed: np.ndarray = offSetPoints(sourceCenters, angle, shift)
-    error, indices = getErrorFromCenters(transformed, dstCenters)
+    error, indices = getIndicesAndErrosFromCenters(transformed, dstCenters)
 
     inverted: bool = False
     if sourceCenters.shape[0] > dstCenters.shape[0]:
@@ -195,13 +198,13 @@ if __name__ == '__main__':
 
     # display results
     plt.subplot(121)
-    plt.title(f'{len(indices)} particles on w02a_pre')
+    plt.title(f'{len(indices)} of {sourceCenters.shape[0]} particles on w02a_pre')
     plt.imshow(srcImg, cmap='gray')
-    plt.scatter(sourceCenters[:, 0], sourceCenters[:, 1], alpha=0.4)
+    # plt.scatter(sourceCenters[:, 0], sourceCenters[:, 1], alpha=0.4)
 
     plt.subplot(122)
-    plt.title(f'{len(indices)} particles on w02a_water')
+    plt.title(f'{len(indices)} of {dstCenters.shape[0]} particles on w02a_water')
     plt.imshow(dstImg, cmap='gray')
-    plt.scatter(transformed[:, 0], transformed[:, 1], alpha=0.4)
+    # plt.scatter(transformed[:, 0], transformed[:, 1], alpha=0.4)
 
     plt.show()

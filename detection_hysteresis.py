@@ -18,6 +18,8 @@ def identify_particles(im, disk_size=3, high=None):
     """
     if high is None:
         high = im.max() * 0.95
+    else:
+        high *= im.max()
 
     low = filters.threshold_li(im[im > 0])
     # The following is basically the manual way of ´hyst = filters.apply_hysteresis_threshold(im, low, high)´,
