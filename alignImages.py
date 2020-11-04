@@ -1,9 +1,6 @@
-from skimage import io
 import cv2
 import numpy as np
 import scipy.optimize as sciOpt
-import matplotlib.pyplot as plt
-import time
 from typing import List, Tuple
 import detection_hysteresis as dh
 
@@ -38,16 +35,26 @@ def getContourCenters(contourList: List[np.ndarray]) -> np.ndarray:
     return centers
 
 
-def getContourCentersFromImage(image: np.ndarray, minArea: float, maxArea: float) -> np.ndarray:
+def getContoursFromImage(image: np.ndarray, params: dh.RecognitionParameters = dh.RecognitionParameters()) -> List[np.ndarray]:
+    """
+    Takes an image, finds particles (hysteresis detection) and returns their contours
+    :param image: unlabelled color image
+    :param params: Recognition Parameters
+    :return: List of contours
+    """
+    labelsImg, *others = dh.identify_particles(image, params)
+    return getContours(labelsImg, params.minArea, params.maxArea)
+
+
+def getContourCentersFromImage(image: np.ndarray, params: dh.RecognitionParameters = dh.RecognitionParameters()) -> np.ndarray:
     """
     Takes an image, finds particles (hysteresis detection) and returns their centers
     :param image: unlabelled color image
-    :param minArea: min Area of a particle to be considered (px**2)
-    :param maxArea: max Area of a particle to be considered (px**2)
+    :param params: Recognition Parameters
     :return: shape (N, 2) array of x, y coordinates of centers
     """
-    labelsImg, *others = dh.identify_particles(image, high=0.5)
-    return getContourCenters(getContours(labelsImg, minArea, maxArea))
+    labelsImg, *others = dh.identify_particles(image, params)
+    return getContourCenters(getContours(labelsImg, params.minArea, params.maxArea))
 
 
 def offSetPoints(points: np.ndarray, angle: float, shift: np.ndarray) -> np.ndarray:
@@ -148,63 +155,3 @@ def findAngleAndShift(points1: np.ndarray, points2: np.ndarray) -> Tuple[float, 
     optAngle, optShift = opt.x[0], opt.x[1:]
     return optAngle, optShift
 
-
-if __name__ == '__main__':
-
-    t0 = time.time()
-    # srcImg: np.ndarray = io.imread(r'w02a_pre_30percent.tif')
-    # dstImg: np.ndarray = io.imread(r'w02a_water_30percent.tif')
-
-    srcImg: np.ndarray = io.imread(r'w20_pre_30percent.tif')
-    dstImg: np.ndarray = io.imread(r'w20_HCl_30percent.tif')
-
-    srcImg = cv2.medianBlur(srcImg, ksize=9)
-    dstImg = cv2.medianBlur(dstImg, ksize=9)
-
-    minParticleArea: float = 500
-    maxParticleArea: float = 1e6
-
-    sourceCenters: np.ndarray = getContourCentersFromImage(srcImg, minParticleArea, maxParticleArea)
-    dstCenters: np.ndarray = getContourCentersFromImage(dstImg, minParticleArea, maxParticleArea)
-    print(f'numSourcePoints {sourceCenters.shape[0]}, numDstPoints {dstCenters.shape[0]}')
-    print(f'loading images and getting contours took {time.time()-t0} seconds')
-
-    t0 = time.time()
-    angle, shift = findAngleAndShift(sourceCenters, dstCenters)
-    print(angle, shift)
-    print(f'getting transform and error took {time.time()-t0} seconds')
-
-    transformed: np.ndarray = offSetPoints(sourceCenters, angle, shift)
-    error, indices = getIndicesAndErrosFromCenters(transformed, dstCenters)
-
-    inverted: bool = False
-    if sourceCenters.shape[0] > dstCenters.shape[0]:
-        inverted = True
-
-    for origInd, targetInd in enumerate(indices):
-        if not inverted:
-            x, y = int(round(sourceCenters[origInd, 0])), int(round(sourceCenters[origInd, 1]))
-        else:
-            x, y = int(round(sourceCenters[targetInd, 0])), int(round(sourceCenters[targetInd, 1]))
-
-        cv2.putText(srcImg, str(origInd), (x, y), cv2.FONT_HERSHEY_SIMPLEX, 5.0, (255, 255, 255), thickness=5)
-
-        if not inverted:
-            x, y = int(round(dstCenters[targetInd, 0])), int(round(dstCenters[targetInd, 1]))
-        else:
-            x, y = int(round(dstCenters[origInd, 0])), int(round(dstCenters[origInd, 1]))
-
-        cv2.putText(dstImg, str(origInd), (x, y), cv2.FONT_HERSHEY_SIMPLEX, 5.0, (255, 255, 255), thickness=5)
-
-    # display results
-    plt.subplot(121)
-    plt.title(f'{len(indices)} of {sourceCenters.shape[0]} particles on w02a_pre')
-    plt.imshow(srcImg, cmap='gray')
-    # plt.scatter(sourceCenters[:, 0], sourceCenters[:, 1], alpha=0.4)
-
-    plt.subplot(122)
-    plt.title(f'{len(indices)} of {dstCenters.shape[0]} particles on w02a_water')
-    plt.imshow(dstImg, cmap='gray')
-    # plt.scatter(transformed[:, 0], transformed[:, 1], alpha=0.4)
-
-    plt.show()

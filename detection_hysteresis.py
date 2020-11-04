@@ -1,34 +1,47 @@
-from matplotlib import pyplot as plt
 import numpy as np
 import pandas as pd
-import pathlib
 import os
+import cv2
 from scipy import ndimage as ndi
-from skimage import filters, img_as_ubyte, io
+from skimage import filters, io
 from skimage.measure import regionprops_table
-from skimage.color import rgb2gray
 from skimage.morphology import binary_closing, disk, remove_small_objects
-
 import datetime
 
 
-def identify_particles(im, disk_size=3, high=None):
+class RecognitionParameters(object):
+    def __init__(self):
+        super(RecognitionParameters, self).__init__()
+        self.highTreshold: float = 0.95  # from 0.0 to 1.0
+        self.lowerThreshold: float = np.nan
+        self.diskSize: int = 3
+        self.minArea: float = 500
+        self.maxArea: float = 1e6
+
+
+def getLowerThresholdForImg(grayscaleImg: np.ndarray) -> float:
+    """
+    calculates an optimized threshold for converting the grayscale image into a binary image.
+    """
+    return filters.threshold_li(grayscaleImg[grayscaleImg > 0])
+
+
+def identify_particles(img: np.ndarray, parameters: 'RecognitionParameters' = RecognitionParameters()):
     """
     Particles on input image are identified by hysteresis thresholding and labeled
+    The used params are also returned, in case they
     """
-    if high is None:
-        high = im.max() * 0.95
-    else:
-        high *= im.max()
-
-    low = filters.threshold_li(im[im > 0])
+    high = img.max() * parameters.highTreshold
+    if np.isnan(parameters.lowerThreshold):
+        parameters.lowerThreshold = getLowerThresholdForImg(img)
+    low = parameters.lowerThreshold
     # The following is basically the manual way of ´hyst = filters.apply_hysteresis_threshold(im, low, high)´,
     # but includes some manipulations to the threshold masks (filling holes, removing small objects)
-    mask_low = ndi.binary_fill_holes(im > low)
+    mask_low = ndi.binary_fill_holes(img > low)
 
-    selem = disk(disk_size)  # * scaling))
+    selem = disk(parameters.diskSize)  # * scaling))
     binary_closing(mask_low, selem, out=mask_low)  # dilation followed by erosion to connect small speckles to particles
-    mask_high = im >= high
+    mask_high = img >= high
 
     # Labeling connected components of mask_low (excluding objects touching image borders)
     labels_low, num_labels_low = ndi.label(mask_low)
@@ -36,11 +49,23 @@ def identify_particles(im, disk_size=3, high=None):
     # seg.clear_border(labels_low, in_place=True)  # OBS! Can this be used for label ojects? It seems to break things for some images but not for others...
 
     # Check which connected components contain pixels from mask_high
-    sums = ndi.sum(mask_high, labels_low, np.arange(num_labels_low + 1))
-    connected_to_high = sums > 0
+    # sums = ndi.sum(mask_high, labels_low, np.arange(num_labels_low + 1))
+    # connected_to_high = sums > 0
+
+    connected_to_high = np.zeros(num_labels_low + 1).astype(np.bool)
+    for i in range(labels_low.max()):
+        if i > 0:
+            ind = labels_low == i
+            masked = img[ind].copy()
+            numPxLabel = cv2.countNonZero(masked)
+            masked[masked < high] = 0
+            numPxHigh = cv2.countNonZero(masked)
+
+            if numPxHigh / numPxLabel > 0.2:
+                connected_to_high[i] = True
+
     hyst = connected_to_high[labels_low]
     hyst = ndi.binary_fill_holes(hyst)
-
     # Assigning labels to final hysteresis image
     labels_hyst, num_labels_hyst = ndi.label(hyst)
     return labels_hyst, num_labels_hyst, hyst, mask_low, mask_high, high, low
@@ -65,7 +90,7 @@ def measure_particles(im, labels_hyst):
 
 if __name__ == '__main__':
     # Pixel sizes of image
-    orgPxSize = 0.359343 #this is the length (and width) of one pixel in µm in the original CZI images in full resolution
+    orgPxSize = 0.359343  # this is the length (and width) of one pixel in µm in the original CZI images in full resolution
 
     # scaling = 0.1 #this is to downscale images for faster processing (set to 1.0 for no downscaling)
     df = pd.DataFrame()  # initialise empty dataframe for saving per-image particle measurments
