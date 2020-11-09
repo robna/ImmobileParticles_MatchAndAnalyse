@@ -150,7 +150,7 @@ def findAngleAndShift(points1: np.ndarray, points2: np.ndarray) -> Tuple[float, 
     points2 = points2.astype(np.float)
     errFunc = lambda x: getDiffOfAngleShift(x, points1, points2)
     xstart = np.array([0, 0, 0])
-    opt = sciOpt.least_squares(errFunc, xstart, bounds=(np.array([-45, -10, -10]), np.array([45, 10, 10])),
+    opt = sciOpt.least_squares(errFunc, xstart, bounds=(np.array([-45, -np.inf, -np.inf]), np.array([45, np.inf, np.inf])),
                                method='dogbox')
     optAngle, optShift = opt.x[0], opt.x[1:]
     return optAngle, optShift

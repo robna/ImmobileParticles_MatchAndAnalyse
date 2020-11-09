@@ -17,6 +17,7 @@ class RecognitionParameters(object):
         self.diskSize: int = 3
         self.minArea: float = 500
         self.maxArea: float = 1e6
+        self.doHysteresis: bool = True
 
 
 def getLowerThresholdForImg(grayscaleImg: np.ndarray) -> float:
@@ -51,20 +52,23 @@ def identify_particles(img: np.ndarray, parameters: 'RecognitionParameters' = Re
     # Check which connected components contain pixels from mask_high
     # sums = ndi.sum(mask_high, labels_low, np.arange(num_labels_low + 1))
     # connected_to_high = sums > 0
+    if parameters.doHysteresis:
+        connected_to_high = np.zeros(num_labels_low + 1).astype(np.bool)
+        for i in range(num_labels_low):
+            if i > 0:
+                ind = labels_low == i
+                masked = img[ind].copy()
+                numPxLabel = cv2.countNonZero(masked)
+                masked[masked < high] = 0
+                numPxHigh = cv2.countNonZero(masked)
 
-    connected_to_high = np.zeros(num_labels_low + 1).astype(np.bool)
-    for i in range(labels_low.max()):
-        if i > 0:
-            ind = labels_low == i
-            masked = img[ind].copy()
-            numPxLabel = cv2.countNonZero(masked)
-            masked[masked < high] = 0
-            numPxHigh = cv2.countNonZero(masked)
+                if numPxHigh / numPxLabel > 0.2:
+                    connected_to_high[i] = True
 
-            if numPxHigh / numPxLabel > 0.2:
-                connected_to_high[i] = True
+        hyst = connected_to_high[labels_low]
+    else:
+        hyst = labels_low
 
-    hyst = connected_to_high[labels_low]
     hyst = ndi.binary_fill_holes(hyst)
     # Assigning labels to final hysteresis image
     labels_hyst, num_labels_hyst = ndi.label(hyst)
