@@ -75,9 +75,9 @@ def offSetPoints(points: np.ndarray, angle: float, shift: np.ndarray) -> np.ndar
     return pointsRot + shift
 
 
-def getIndicesAndErrosFromCenters(lessPoints: np.ndarray, morePoints: np.ndarray) -> Tuple[float, List[int]]:
+def getIndicesAndErrosFromCenters(lessPoints: np.ndarray, morePoints: np.ndarray) -> Tuple[np.ndarray, List[int]]:
     """
-    Calculates the distance of all centers and report the assignment of points in centers2 to points in center1
+    Calculates the distance of all centers and report the assignment of points in lessPoints to points in morePoints
     :param lessPoints: (N x 2) shape array of x, y coordinates
     :param morePoints: (M x 2) shape array of x, y coordinates, ideally M >= N
     :return: tuple: error (float), list of indices mapping the shorter list of points to the longer list of points
@@ -85,25 +85,23 @@ def getIndicesAndErrosFromCenters(lessPoints: np.ndarray, morePoints: np.ndarray
     if morePoints.shape[0] < lessPoints.shape[0]:
         morePoints, lessPoints = lessPoints, morePoints
 
-    err: float = 0.0
-    copyMorePoints: np.ndarray = morePoints.copy()
+    errors: List[float] = []
+    copyMorePoints: np.ndarray = morePoints.copy()  # We will remove "found" points from here to avoid assigning one of these points more than one time.
     indices: List[int] = []
-    i: int = 0
-    while i < lessPoints.shape[0]:
+
+    for i in range(lessPoints.shape[0]):
         curPoint = lessPoints[i]
         distances: np.ndarray = np.linalg.norm(copyMorePoints - curPoint, axis=1)
         closestPointIndex = np.argmin(distances)
-        err += distances[closestPointIndex]
-        
-        closestPoint: np.ndarray = copyMorePoints[closestPointIndex, :]
-        distances = np.linalg.norm(morePoints - closestPoint, axis=1)
-        indices.append(int(np.argmin(distances)))
-        assert distances[indices[-1]] == 0
-        copyMorePoints = np.delete(copyMorePoints, closestPointIndex, axis=0)
-        
-        i += 1
+        errors.append(distances[closestPointIndex])
 
-    return err, indices
+        # now find the index of that closestPoint in the original morePoints Array
+        closestPoint: np.ndarray = copyMorePoints[closestPointIndex, :]
+        origInd = np.where(morePoints == closestPoint)[0][0]
+        indices.append(origInd)
+        copyMorePoints = np.delete(copyMorePoints, closestPointIndex, axis=0)
+
+    return np.array(errors), indices
 
 
 def getDiffOfAngleShift(angleShift: np.ndarray, origPoints: np.ndarray, knownDstPoints: np.ndarray) -> np.ndarray:
@@ -125,18 +123,18 @@ def getDiffOfAngleShift(angleShift: np.ndarray, origPoints: np.ndarray, knownDst
     dstPoints: np.ndarray = np.zeros((lowerNumPoints, 2), dtype=np.float)
 
     err, ind = getIndicesAndErrosFromCenters(transformedPoints, knownDstPoints)
-    assert len(ind) == lowerNumPoints
-
-    if transformedPoints.shape[0] <= knownDstPoints.shape[0]:
-        srcPoints = transformedPoints
-        for origInd, associatedInd in enumerate(ind):
-            dstPoints[origInd, :] = knownDstPoints[associatedInd]
-    else:
-        dstPoints = knownDstPoints
-        for origInd, associatedInd in enumerate(ind):
-            srcPoints[origInd] = transformedPoints[associatedInd]
-
-    err: np.ndarray = (srcPoints - dstPoints).ravel()
+    # assert len(ind) == lowerNumPoints
+    #
+    # if transformedPoints.shape[0] <= knownDstPoints.shape[0]:
+    #     srcPoints = transformedPoints
+    #     for origInd, associatedInd in enumerate(ind):
+    #         dstPoints[origInd, :] = knownDstPoints[associatedInd]
+    # else:
+    #     dstPoints = knownDstPoints
+    #     for origInd, associatedInd in enumerate(ind):
+    #         srcPoints[origInd] = transformedPoints[associatedInd]
+    #
+    # err: np.ndarray = (srcPoints - dstPoints).ravel()
 
     return err
 
