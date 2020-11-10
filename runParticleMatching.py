@@ -1,106 +1,89 @@
 from skimage import io
-import matplotlib.pyplot as plt
 import time
 import os
+import matplotlib.pyplot as plt
+from typing import TYPE_CHECKING
 from alignImages import *
-from detection_hysteresis import getLowerThresholdForImg, RecognitionParameters
+from detection_hysteresis import getLowerThresholdForImg, RecognitionParameters, measure_particles
+from outputs import generateOutputGraphs, getRatioOfProperty
+if TYPE_CHECKING:
+    import pandas as pd
 
 t0 = time.time()
 
-# pathSrcImg = r'w02a_pre_30percent.tif'
-# pathDstImg = r'w02a_water_30percent.tif'
+config = {"pathBeforeImg": r'w20_pre.tif',
+          "pathAfterImg": r'w20_HCl.tif',
+          "imgScaleFactor": 0.5,  # (0...1.0)
+          "minParticleArea": 100,  # in px**2
+          "maxParticleArea": 15000,  # in px**2
+          "hystHighThresh": 0.6,  # relative to maximum intensity
+          "particleDistTolerance": 2,  # in percent (0...100)
+          "property": "area",  # the property to calculate the after/before ratio of
+          "showPartImages": True  # whether or not to show the found and paired particles in before and after image
+          }
 
-# pathSrcImg = r'w20_pre_30percent.tif'
-# pathDstImg = r'w20_HCl_30percent.tif'
+beforeName = os.path.basename(config["pathBeforeImg"]).split('tif')[0]
+afterName = os.path.basename(config["pathAfterImg"]).split('tif')[0]
 
-# pathSrcImg = r'w20_pre.tif'
-# pathDstImg = r'w20_HCl.tif'
+beforeImg: np.ndarray = io.imread(config["pathBeforeImg"])
+afterImg: np.ndarray = io.imread(config["pathAfterImg"])
 
-pathSrcImg = r'w05_pre.tif'
-pathDstImg = r'w05_KOH.tif'
+beforeImg = cv2.resize(beforeImg, None, fx=config["imgScaleFactor"], fy=config["imgScaleFactor"])
+afterImg = cv2.resize(afterImg, None, fx=config["imgScaleFactor"], fy=config["imgScaleFactor"])
 
-srcImg: np.ndarray = io.imread(pathSrcImg)
-dstImg: np.ndarray = io.imread(pathDstImg)
-
-scaleFac: float = 0.3
-srcImg = cv2.resize(srcImg, None, fx=scaleFac, fy=scaleFac)
-dstImg = cv2.resize(dstImg, None, fx=scaleFac, fy=scaleFac)
-
-srcImg = cv2.medianBlur(srcImg, ksize=9)
-dstImg = cv2.medianBlur(dstImg, ksize=9)
+beforeImg = cv2.medianBlur(beforeImg, ksize=9)
+afterImg = cv2.medianBlur(afterImg, ksize=9)
 
 params: RecognitionParameters = RecognitionParameters()
-params.highTreshold = 0.6
-params.lowerThreshold = getLowerThresholdForImg(srcImg) * 1.5
-params.minArea = 100
-params.maxArea = 15000
+params.highTreshold = config["hystHighThresh"]
+params.lowerThreshold = getLowerThresholdForImg(beforeImg) * 1.5
+params.minArea = config["minParticleArea"]
+params.maxArea = config["maxParticleArea"]
 params.doHysteresis = False  # Don't do hysteresis first, just to get all particles (better for getting transform)
 
-sourceContours: List[np.ndarray] = getContoursFromImage(srcImg, params)
-sourceCenters: np.ndarray = getContourCenters(sourceContours)
+_, beforeContours = getLabelsAndContoursFromImage(beforeImg, params)
+beforeCenters: np.ndarray = getContourCenters(beforeContours)
 
-dstContours: List[np.ndarray] = getContoursFromImage(dstImg, params)
-dstCenters: np.ndarray = getContourCenters(dstContours)
+_, afterContours = getLabelsAndContoursFromImage(afterImg, params)
+afterCenters: np.ndarray = getContourCenters(afterContours)
 print(f'loading images and getting contours took {time.time()-t0} seconds')
 
 t0 = time.time()
-ymin, ymax = sourceCenters[:, 1].min(), sourceCenters[:, 1].max()
-maxDistError = (ymax - ymin) * 0.02  # i.e., 2 percent of maximum y range (just to kind of map relative to img resolution)
-angle, shift = findAngleAndShift(sourceCenters, dstCenters, maxDistError)
-print(f'angle: {angle}, shift: {shift}, numSrcCenters: {len(sourceContours)}, numDstCenters: {len(dstCenters)}')
+ymin, ymax = beforeCenters[:, 1].min(), beforeCenters[:, 1].max()
+maxDistError = (ymax - ymin) * config["particleDistTolerance"] / 100
+angle, shift = findAngleAndShift(beforeCenters, afterCenters, maxDistError)
+# print(f'angle: {angle}, shift: {shift}, numSrcCenters: {len(beforeContours)}, numDstCenters: {len(afterCenters)}')
 print(f'getting transform and error took {time.time()-t0} seconds')
 
 t0 = time.time()
 # No get only the relevant particles
 params.doHysteresis = True
-sourceContours = getContoursFromImage(srcImg, params)
-sourceCenters = getContourCenters(sourceContours)
-dstContours = getContoursFromImage(dstImg, params)
-dstCenters = getContourCenters(dstContours)
+beforeLabels, beforeContours = getLabelsAndContoursFromImage(beforeImg, params)
+beforeCenters = getContourCenters(beforeContours)
+afterLabels, afterContours = getLabelsAndContoursFromImage(afterImg, params)
+afterCenters = getContourCenters(afterContours)
 
-transformed: np.ndarray = offSetPoints(sourceCenters, angle, shift)
-error, indices = getIndicesAndErrosFromCenters(transformed, dstCenters, maxDistError)
+print(f"--------------RESULTS OF COMPARING {afterName.upper()} to {beforeName.upper()}--------------")
+print(f'Num Particles before: {len(beforeContours)}, num Particles after: {len(afterContours)}')
 
-# Display results
-inverted: bool = False
-if sourceCenters.shape[0] > dstCenters.shape[0]:
-    inverted = True
+transformed: np.ndarray = offSetPoints(beforeCenters, angle, shift)
+error, indexMap = getIndicesAndErrosFromCenters(transformed, afterCenters, maxDistError)
+print(f'Thereof {len(indexMap)} could be successfully paired to calculate statistics.')
 
-for origInd, targetInd in indices.items():
-    if not inverted:
-        x, y = int(round(sourceCenters[origInd, 0])), int(round(sourceCenters[origInd, 1]))
-        cnt = sourceContours[origInd]
-    else:
-        x, y = int(round(sourceCenters[targetInd, 0])), int(round(sourceCenters[targetInd, 1]))
-        cnt = sourceContours[targetInd]
+if config["showPartImages"]:
+    fig1, fig2 = generateOutputGraphs(beforeCenters, afterCenters, beforeContours, afterContours, beforeImg, afterImg,
+                                      beforeName, afterName, indexMap)
+    fig1.show()
+    fig2.show()
 
-    cv2.drawContours(srcImg, [cnt], -1, 255, 2)
-    cv2.putText(srcImg, str(origInd), (x, y), cv2.FONT_HERSHEY_SIMPLEX, 5.0, 255, thickness=5)
+statsBefore: 'pd.DataFrame' = measure_particles(beforeImg, beforeLabels)
+statsAfter: 'pd.DataFrame' = measure_particles(afterImg, afterLabels)
 
-    if not inverted:
-        x, y = int(round(dstCenters[targetInd, 0])), int(round(dstCenters[targetInd, 1]))
-        cnt = dstContours[targetInd]
-    else:
-        x, y = int(round(dstCenters[origInd, 0])), int(round(dstCenters[origInd, 1]))
-        cnt = dstContours[origInd]
+ratios: np.ndarray = getRatioOfProperty(config["property"], statsBefore, statsAfter, indexMap)
+resultFig: plt.Figure = plt.figure()
+ax: plt.Axes = resultFig.add_subplot()
+ax.boxplot(ratios, showfliers=False)
+ax.set_title(f"BoxPlot of {beforeName} / {afterName} \nratio of {config['property']} of {len(indexMap)} particles")
+resultFig.show()
+print(f"Mean ratio of {config['property']} = {np.mean(ratios)}")
 
-    cv2.drawContours(dstImg, [cnt], -1, 255, 2)
-    cv2.putText(dstImg, str(origInd), (x, y), cv2.FONT_HERSHEY_SIMPLEX, 5.0, 255, thickness=5)
-
-fig1 = plt.figure()
-ax1 = fig1.add_subplot()
-srcName = os.path.basename(pathSrcImg).split('tif')[0]
-ax1.set_title(f'{len(indices)} of {sourceCenters.shape[0]} particles on {srcName}')
-ax1.imshow(srcImg, cmap='gray')
-# ax1.scatter(sourceCenters[:, 0], sourceCenters[:, 1], color='green', alpha=0.2)
-fig1.tight_layout()
-fig1.show()
-
-fig2 = plt.figure()
-ax2 = fig2.add_subplot()
-dstName = os.path.basename(pathDstImg).split('tif')[0]
-ax2.set_title(f'{len(indices)} of {dstCenters.shape[0]} particles on {dstName}')
-ax2.imshow(dstImg, cmap='gray')
-# ax2.scatter(transformed[:, 0], transformed[:, 1], color='green', alpha=0.2)
-fig2.tight_layout()
-fig2.show()

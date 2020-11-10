@@ -75,11 +75,11 @@ def identify_particles(img: np.ndarray, parameters: 'RecognitionParameters' = Re
     return labels_hyst, num_labels_hyst, hyst, mask_low, mask_high, high, low
 
 
-def measure_particles(im, labels_hyst):
+def measure_particles(colorImg: np.ndarray, labels_hyst: np.ndarray) -> pd.DataFrame:
     """
     Particles on input image are measured using the labeled regions and results are reported in a pandas dataframe
     """
-    props = regionprops_table(labels_hyst, im, properties=(
+    props = regionprops_table(labels_hyst, colorImg, properties=(
         'label',
         'area',
         'perimeter',

@@ -36,15 +36,18 @@ def getContourCenters(contourList: List[np.ndarray]) -> np.ndarray:
     return centers
 
 
-def getContoursFromImage(image: np.ndarray, params: dh.RecognitionParameters = dh.RecognitionParameters()) -> List[np.ndarray]:
+def getLabelsAndContoursFromImage(image: np.ndarray, params: dh.RecognitionParameters = None) -> Tuple[np.ndarray, List[np.ndarray]]:
     """
     Takes an image, finds particles (hysteresis detection) and returns their contours
     :param image: unlabelled color image
     :param params: Recognition Parameters
     :return: List of contours
     """
+    if params is None:
+        params = dh.RecognitionParameters()
+
     labelsImg, *others = dh.identify_particles(image, params)
-    return getContours(labelsImg, params.minArea, params.maxArea)
+    return labelsImg, getContours(labelsImg, params.minArea, params.maxArea)
 
 
 def getContourCentersFromImage(image: np.ndarray, params: dh.RecognitionParameters = dh.RecognitionParameters()) -> np.ndarray:
