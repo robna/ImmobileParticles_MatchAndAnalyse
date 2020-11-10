@@ -22,7 +22,7 @@ pathDstImg = r'w05_KOH.tif'
 srcImg: np.ndarray = io.imread(pathSrcImg)
 dstImg: np.ndarray = io.imread(pathDstImg)
 
-scaleFac: float = 0.5
+scaleFac: float = 0.3
 srcImg = cv2.resize(srcImg, None, fx=scaleFac, fy=scaleFac)
 dstImg = cv2.resize(dstImg, None, fx=scaleFac, fy=scaleFac)
 
@@ -41,11 +41,12 @@ sourceCenters: np.ndarray = getContourCenters(sourceContours)
 
 dstContours: List[np.ndarray] = getContoursFromImage(dstImg, params)
 dstCenters: np.ndarray = getContourCenters(dstContours)
-print(f'numSourcePoints {sourceCenters.shape[0]}, numDstPoints {dstCenters.shape[0]}')
 print(f'loading images and getting contours took {time.time()-t0} seconds')
 
 t0 = time.time()
-angle, shift = findAngleAndShift(sourceCenters, dstCenters)
+ymin, ymax = sourceCenters[:, 1].min(), sourceCenters[:, 1].max()
+maxDistError = (ymax - ymin) * 0.02  # i.e., 2 percent of maximum y range (just to kind of map relative to img resolution)
+angle, shift = findAngleAndShift(sourceCenters, dstCenters, maxDistError)
 print(f'angle: {angle}, shift: {shift}, numSrcCenters: {len(sourceContours)}, numDstCenters: {len(dstCenters)}')
 print(f'getting transform and error took {time.time()-t0} seconds')
 
@@ -58,33 +59,34 @@ dstContours = getContoursFromImage(dstImg, params)
 dstCenters = getContourCenters(dstContours)
 
 transformed: np.ndarray = offSetPoints(sourceCenters, angle, shift)
-error, indices = getIndicesAndErrosFromCenters(transformed, dstCenters)
+error, indices = getIndicesAndErrosFromCenters(transformed, dstCenters, maxDistError)
 
+# Display results
 inverted: bool = False
 if sourceCenters.shape[0] > dstCenters.shape[0]:
     inverted = True
 
-for origInd, targetInd in enumerate(indices):
+for origInd, targetInd in indices.items():
     if not inverted:
         x, y = int(round(sourceCenters[origInd, 0])), int(round(sourceCenters[origInd, 1]))
+        cnt = sourceContours[origInd]
     else:
         x, y = int(round(sourceCenters[targetInd, 0])), int(round(sourceCenters[targetInd, 1]))
+        cnt = sourceContours[targetInd]
 
+    cv2.drawContours(srcImg, [cnt], -1, 255, 2)
     cv2.putText(srcImg, str(origInd), (x, y), cv2.FONT_HERSHEY_SIMPLEX, 5.0, 255, thickness=5)
 
     if not inverted:
         x, y = int(round(dstCenters[targetInd, 0])), int(round(dstCenters[targetInd, 1]))
+        cnt = dstContours[targetInd]
     else:
         x, y = int(round(dstCenters[origInd, 0])), int(round(dstCenters[origInd, 1]))
+        cnt = dstContours[origInd]
 
+    cv2.drawContours(dstImg, [cnt], -1, 255, 2)
     cv2.putText(dstImg, str(origInd), (x, y), cv2.FONT_HERSHEY_SIMPLEX, 5.0, 255, thickness=5)
 
-print(f'final computation took {time.time()-t0} seconds')
-
-cv2.drawContours(srcImg, sourceContours, -1, 255, 2)
-cv2.drawContours(dstImg, dstContours, -1, 255, 2)
-
-# display results
 fig1 = plt.figure()
 ax1 = fig1.add_subplot()
 srcName = os.path.basename(pathSrcImg).split('tif')[0]

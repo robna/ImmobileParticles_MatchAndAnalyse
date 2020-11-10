@@ -14,31 +14,50 @@ class TestImageAlign(unittest.TestCase):
         points: np.ndarray = np.arange(10).reshape((5, 2))
         error, indices = ai.getIndicesAndErrosFromCenters(points, points)
         self.assertEqual(np.sum(error), 0.0)
-        self.assertEqual(indices, [0, 1, 2, 3, 4])
+        for key, val in indices.items():
+            self.assertEqual(key, val)
 
-        points2: np.ndarray = points + np.array([1, 0])
+        # offset points by a bit
+        points2: np.ndarray = points + np.array([0.01, 0])
         error, indices = ai.getIndicesAndErrosFromCenters(points, points2)
-        self.assertEqual(np.sum(error), 5.0)
-        self.assertEqual(indices, [0, 1, 2, 3, 4])
+
+        for key, val in indices.items():
+            self.assertEqual(key, val)
+        self.assertAlmostEqual(np.sum(error), 0.05)
 
         points2Copy = points2.copy()
+        # let's swap some of the points
         points2[0, :], points2[1, :] = points2Copy[1, :], points2Copy[0, :]
         points2[2, :], points2[4, :] = points2Copy[4, :], points2Copy[2, :]
         error, indices = ai.getIndicesAndErrosFromCenters(points, points2)
-        self.assertEqual(np.sum(error), 5.0)
-        self.assertEqual(indices, [1, 0, 4, 3, 2])
+        expectedInd = {0: 1,
+                       1: 0,
+                       2: 4,
+                       3: 3,
+                       4: 2}
 
-        points3: np.ndarray = np.zeros((7, 2))  # add points that are outliers
+        self.assertAlmostEqual(np.sum(error), 0.05)
+        self.assertEqual(len(indices), 5)
+        for key in indices.keys():
+            self.assertEqual(indices[key], expectedInd[key])
+
+        # add points that are outliers
+        points3: np.ndarray = np.zeros((7, 2))
         points3[:5, :] = points2
         points3[5:, :] = np.array([[10, 20], [-2.5, 3.5]])
         error, indices = ai.getIndicesAndErrosFromCenters(points, points2)
-        self.assertEqual(np.sum(error), 5.0)
-        self.assertEqual(indices, [1, 0, 4, 3, 2])
+        self.assertAlmostEqual(np.sum(error), 0.05)
+        for key in indices.keys():
+            self.assertEqual(indices[key], expectedInd[key])
 
         points4: np.ndarray = points2[:3, :]  # let's have less points in the second array
         error, indices = ai.getIndicesAndErrosFromCenters(points, points4)
-        self.assertEqual(np.sum(error), 3.0)
-        self.assertEqual(indices, [1, 0, 4])
+        self.assertAlmostEqual(np.sum(error), 0.03)
+        expectedInd = {0: 1,
+                       1: 0,
+                       2: 4}
+        for key in indices.keys():
+            self.assertEqual(indices[key], expectedInd[key])
 
     def test_offset_points(self):
         points: np.ndarray = np.arange(10).reshape((5, 2))
@@ -94,7 +113,7 @@ class TestImageAlign(unittest.TestCase):
                 optAngle, optShift = ai.findAngleAndShift(points, newPoints2)
                 transformedPoints = ai.offSetPoints(points, optAngle, optShift)
                 err, _ = ai.getIndicesAndErrosFromCenters(transformedPoints, newPoints2)
-                self.assertAlmostEqual(np.sum(err), 0)
+                self.assertAlmostEqual(np.sum(err), 0, places=6)
                 self.assertAlmostEqual(optAngle, angle, places=6)
                 self.assertAlmostEqual(optShift[0], shift[0])
                 self.assertAlmostEqual(optShift[1], shift[1])
@@ -105,7 +124,7 @@ class TestImageAlign(unittest.TestCase):
                 optAngle, optShift = ai.findAngleAndShift(points, newPoints3)
                 transformedPoints: np.ndarray = ai.offSetPoints(points, optAngle, optShift)
                 err, _ = ai.getIndicesAndErrosFromCenters(transformedPoints, newPoints3)
-                self.assertAlmostEqual(np.sum(err), 0)
+                self.assertAlmostEqual(np.sum(err), 0, places=6)
                 self.assertAlmostEqual(optAngle, angle, places=6)
                 self.assertAlmostEqual(optShift[0], shift[0])
                 self.assertAlmostEqual(optShift[1], shift[1])

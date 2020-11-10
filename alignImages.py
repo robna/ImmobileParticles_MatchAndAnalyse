@@ -1,7 +1,8 @@
 import cv2
 import numpy as np
 import scipy.optimize as sciOpt
-from typing import List, Tuple
+from scipy.spatial import distance_matrix
+from typing import List, Tuple, Dict
 import detection_hysteresis as dh
 
 
@@ -75,36 +76,39 @@ def offSetPoints(points: np.ndarray, angle: float, shift: np.ndarray) -> np.ndar
     return pointsRot + shift
 
 
-def getIndicesAndErrosFromCenters(lessPoints: np.ndarray, morePoints: np.ndarray) -> Tuple[np.ndarray, List[int]]:
+def getIndicesAndErrosFromCenters(lessPoints: np.ndarray, morePoints: np.ndarray,
+                                  maxDistError: float = np.inf) -> Tuple[np.ndarray, Dict[int, int]]:
     """
     Calculates the distance of all centers and report the assignment of points in lessPoints to points in morePoints
     :param lessPoints: (N x 2) shape array of x, y coordinates
     :param morePoints: (M x 2) shape array of x, y coordinates, ideally M >= N
+    :param maxDistError: maximum tolerated distance between points to be accepted as pairings
     :return: tuple: error (float), list of indices mapping the shorter list of points to the longer list of points
     """
     if morePoints.shape[0] < lessPoints.shape[0]:
         morePoints, lessPoints = lessPoints, morePoints
 
     errors: List[float] = []
-    copyMorePoints: np.ndarray = morePoints.copy()  # We will remove "found" points from here to avoid assigning one of these points more than one time.
-    indices: List[int] = []
+    indices: Dict[int, int] = {}
+    distMat: np.ndarray = distance_matrix(lessPoints, morePoints)
 
-    for i in range(lessPoints.shape[0]):
-        curPoint = lessPoints[i]
-        distances: np.ndarray = np.linalg.norm(copyMorePoints - curPoint, axis=1)
-        closestPointIndex = np.argmin(distances)
-        errors.append(distances[closestPointIndex])
+    for _ in range(lessPoints.shape[0]):
+        i, j = np.unravel_index(distMat.argmin(), distMat.shape)  # get the pairing which is closest together
+        minDist = distMat[i, j]
+        distMat[i, :] = np.inf  # effectively removes these indices from further consideration
+        distMat[:, j] = np.inf  # effectively removes these indices from further consideration
 
-        # now find the index of that closestPoint in the original morePoints Array
-        closestPoint: np.ndarray = copyMorePoints[closestPointIndex, :]
-        origInd = np.where(morePoints == closestPoint)[0][0]
-        indices.append(origInd)
-        copyMorePoints = np.delete(copyMorePoints, closestPointIndex, axis=0)
+        if minDist <= maxDistError:
+            indices[i] = j
+            errors.append(minDist)
+        else:
+            errors.append(100000)  # add a high penalty
 
     return np.array(errors), indices
 
 
-def getDiffOfAngleShift(angleShift: np.ndarray, origPoints: np.ndarray, knownDstPoints: np.ndarray) -> np.ndarray:
+def getDiffOfAngleShift(angleShift: np.ndarray, origPoints: np.ndarray, knownDstPoints: np.ndarray,
+                        maxDistError: float = np.inf) -> np.ndarray:
     """
     Applies angle and shift to the origPoints and calulates differences to the knownDstPoints.
     First, the transform is applied to origPoints. Then, the transformed Points are mapped to the known Dst points
@@ -112,44 +116,46 @@ def getDiffOfAngleShift(angleShift: np.ndarray, origPoints: np.ndarray, knownDst
     :param angleShift: shape(3) array, [0] = angle (degree), [1, 2] = x, y offset
     :param origPoints: Nx2 array of N source points
     :param knownDstPoints: Mx2 array of M target points, M can or cannot be equal N
+    :param maxDistError: maximum tolerated distance between points to be accepted as pairings
     :return: ravelled differences of all coordinates, suitable for least_square optimization
     """
     origPoints = origPoints.astype(np.float)  # just to make sure not to have any integer datatypes...
     knownDstPoints = knownDstPoints.astype(np.float)
     transformedPoints = offSetPoints(origPoints, angleShift[0], np.array([angleShift[1], angleShift[2]]))
 
-    lowerNumPoints: int = min(transformedPoints.shape[0], knownDstPoints.shape[0])
-    srcPoints: np.ndarray = np.zeros((lowerNumPoints, 2), dtype=np.float)
-    dstPoints: np.ndarray = np.zeros((lowerNumPoints, 2), dtype=np.float)
-
-    err, ind = getIndicesAndErrosFromCenters(transformedPoints, knownDstPoints)
-    # assert len(ind) == lowerNumPoints
-    #
-    # if transformedPoints.shape[0] <= knownDstPoints.shape[0]:
-    #     srcPoints = transformedPoints
-    #     for origInd, associatedInd in enumerate(ind):
-    #         dstPoints[origInd, :] = knownDstPoints[associatedInd]
-    # else:
-    #     dstPoints = knownDstPoints
-    #     for origInd, associatedInd in enumerate(ind):
-    #         srcPoints[origInd] = transformedPoints[associatedInd]
-    #
-    # err: np.ndarray = (srcPoints - dstPoints).ravel()
-
+    err, ind = getIndicesAndErrosFromCenters(transformedPoints, knownDstPoints, maxDistError)
+    assert len(ind) > 0
     return err
 
 
-def findAngleAndShift(points1: np.ndarray, points2: np.ndarray) -> Tuple[float, np.ndarray]:
+def findAngleAndShift(points1: np.ndarray, points2: np.ndarray,
+                      maxDistError: float = np.inf) -> Tuple[float, np.ndarray]:
     """
     Finds the best fitting angle and shift for the given pair of points. They don't have to be ordered.
     :return tuple(optAngle: float, optShift: (1x2)np.ndarray)
     """
     points1 = points1.astype(np.float)
     points2 = points2.astype(np.float)
-    errFunc = lambda x: getDiffOfAngleShift(x, points1, points2)
+    errFunc = lambda x: getDiffOfAngleShift(x, points1, points2, maxDistError)
     xstart = np.array([0, 0, 0])
     opt = sciOpt.least_squares(errFunc, xstart, bounds=(np.array([-45, -np.inf, -np.inf]), np.array([45, np.inf, np.inf])),
                                method='dogbox')
     optAngle, optShift = opt.x[0], opt.x[1:]
     return optAngle, optShift
 
+
+def getCentralPoints(points: np.ndarray) -> np.ndarray:
+    xmin, ymin = points[:, 0].min(), points[:, 1].min()
+    xmax, ymax = points[:, 0].max(), points[:, 1].max()
+    diffX, diffY = xmax - xmin, ymax - ymin
+    centerx, centery = xmin + diffX / 2, ymin + diffY / 2
+
+    lowX, highX = centerx - diffX/3, centerx + diffX/3
+    lowY, highY = centery - diffY/3, centery + diffY/3
+
+    newPoints: List[np.ndarray] = []
+    for point in points:
+        if lowX <= point[0] <= highX and lowY <= point[1] <= highY:
+            newPoints.append(point)
+
+    return np.array(newPoints)
