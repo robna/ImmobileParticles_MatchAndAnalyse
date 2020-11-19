@@ -24,7 +24,7 @@ def getLowerThresholdForImg(grayscaleImg: np.ndarray) -> float:
     """
     calculates an optimized threshold for converting the grayscale image into a binary image.
     """
-    return filters.threshold_li(grayscaleImg[grayscaleImg > 0])
+    return filters.threshold_otsu(grayscaleImg[grayscaleImg > 0])
 
 
 def identify_particles(img: np.ndarray, parameters: 'RecognitionParameters' = RecognitionParameters()):
@@ -62,7 +62,7 @@ def identify_particles(img: np.ndarray, parameters: 'RecognitionParameters' = Re
                 masked[masked < high] = 0
                 numPxHigh = cv2.countNonZero(masked)
 
-                if numPxHigh / numPxLabel > 0.2:
+                if numPxHigh / numPxLabel > 0.1:
                     connected_to_high[i] = True
 
         hyst = connected_to_high[labels_low]
