@@ -74,8 +74,9 @@ def runPM(pathBeforeImg, pathAfterImg):
 
     statsBefore: 'pd.DataFrame' = measure_particles(beforeImg, beforeLabels)
     statsAfter: 'pd.DataFrame' = measure_particles(afterImg, afterLabels)
+    ratios: np.ndarray = getRatioOfProperty(config["property"], statsBefore, statsAfter, indexMap)
 
-    return statsBefore, statsAfter, indexMap
+    return statsBefore, statsAfter, indexMap, ratios
 
 if __name__ == '__main__':
     print(f"--------------RESULTS OF COMPARING {afterName.upper()} to {beforeName.upper()}--------------")
