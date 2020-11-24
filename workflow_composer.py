@@ -16,6 +16,7 @@ keys.sort_values(by=['polymer', 'treatment'], inplace=True)  # sort the keys tab
 
 wafer_results = keys.assign(pre_count=np.nan, post_count=np.nan, matched_count=np.nan,
                             process_time=np.nan)  # prepare a results dataframe
+particle_results = pd.DataFrame()
 
 pre_paths = [item for item in Path(  # pathlib.Path.glob creates a generator, which is used to make a list of paths here
     '/run/media/nibor/data_ext/quantDigest_imageData/tif_pre/').glob(  # enter path to pre image directory
@@ -77,12 +78,10 @@ if __name__ == '__main__':
             wafer_results.at[cwn, 'matched_count'] = len(ratios)
             wafer_results.at[cwn, 'process_time'] = tn
 
-            try:
-                particle_results
-            except NameError:
-                particle_results = stats_combined
-            else:
-                particle_results = particle_results.append(stats_combined)
+            particle_results = particle_results.append(stats_combined)
+
+wafer_results.replace({'Napoly':'SPT', '2c':'Acrylate', '4c':'Epoxy'}, inplace=True)
+particle_results.replace({'Napoly':'SPT', '2c':'Acrylate', '4c':'Epoxy'}, inplace=True)
 
 wafer_results.to_csv('../wafer_results_{}.csv'.format(pd.datetime.today().strftime('%d-%m-%y_%H-%M')))
 particle_results.to_csv('../particle_results_{}.csv'.format(pd.datetime.today().strftime('%d-%m-%y_%H-%M')))
