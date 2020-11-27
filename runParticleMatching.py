@@ -9,9 +9,13 @@ if TYPE_CHECKING:
 
 t0 = time.time()
 
-config = {"imgScaleFactor": 1.0,  # (0...1.0)
-          "minParticleArea": 600,  # in px**2
-          "maxParticleArea": np.inf,  # 15000,  # in px**2
+px_res_orig = 0.35934295644272635  # µm / px in original resolution of microscope
+pyr_lev = 2  # used image level of the pyramid image data from CZI images
+px_res = px_res_orig * pyr_lev  # pixel resolution [µm / px] of the images that were effectively used
+
+config = {"imgScaleFactor": 1,  # (0...1.0)
+          "minParticleArea": 152,  # ~ ESD 10 µm     # in px**2
+          "maxParticleArea": 15206,  # ~ ESD 100 µm  # in px**2
           "hystHighThresh": 0.75,  # relative to maximum intensity
           "particleDistTolerance": 3,  # in percent (0...100)
           "property": "area",  # the property to calculate the after/before ratio of

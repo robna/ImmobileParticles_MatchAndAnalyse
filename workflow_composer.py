@@ -7,18 +7,30 @@ import concurrent.futures
 
 import runParticleMatching as pm
 
-path_pre = r'C:\Users\xbrjos\Desktop\New folder\quantDigest_imageData\tif_pre_test'
-path_post = r'C:\Users\xbrjos\Desktop\New folder\quantDigest_imageData\tif_post'
+#%%
+t_start = time.time()
+t_start_formatted = time.strftime('%H:%M:%S', time.localtime(t_start))
+print(f'Start time is:   {t_start_formatted}')
 
-# These keys are required for each process, so we leave it here to have it accesible as global varibale in each process..
+#%%
+#path_pre = r'C:\Users\xbrjos\Desktop\New folder\quantDigest_imageData\tif_pre_test'
+#path_post = r'C:\Users\xbrjos\Desktop\New folder\quantDigest_imageData\tif_post'
+
+pre_paths = [item for item in Path(  # pathlib.Path.glob creates a generator, which is used to make a list of paths here
+    '/run/media/nibor/data_ext/quantDigest_imageData/tif_pre/').glob(  # enter path to pre image directory
+    '*.tif')]  # collect all tiff files from path
+pre_paths = sorted(pre_paths, key=lambda x: keys.index.get_loc(x.stem.split('_')[0]))  # sort paths like the key table
+
+#%%
+# These keys are required for each process, so we leave it here to have it accessible as global variable in each process..
 keys = pd.read_csv('wafer-polymer-keyfile.csv', index_col='wafer')
 keys.dropna(inplace=True)
 keys.sort_values(by=['polymer', 'treatment'], inplace=True)  # sort the keys table after polymer and treatment
 
-
+#%%
 def process_image_pair(pre_image_path):
     t0 = time.time()
-    print('processing', pre_image_path)
+    #print('processing', pre_image_path)
 
     cwn = pre_image_path.stem.split('_')[0]  # get current wafer name
     cwp = keys.loc[cwn]['polymer']  # get current wafer polymer
@@ -52,7 +64,7 @@ def process_image_pair(pre_image_path):
     tn = round((time.time() - t0) / 60, ndigits=1)
     return tn, cwn, cwp, cwt, statsBefore, statsAfter, stats_combined, indexBefore2After, ratios
 
-
+#%%
 if __name__ == '__main__':
     t_start = time.time()
     t_start_formatted = time.strftime('%H:%M:%S', time.localtime(t_start))
@@ -81,11 +93,12 @@ if __name__ == '__main__':
 
             particle_results = particle_results.append(stats_combined)
 
-    wafer_results.replace({'Napoly': 'SPT', '2c': 'Acrylate', '4c': 'Epoxy'}, inplace=True)
-    particle_results.replace({'Napoly': 'SPT', '2c': 'Acrylate', '4c': 'Epoxy'}, inplace=True)
+#%%
+wafer_results.replace({'pentane':'Pentane', 'Napoly':'SPT', '2c':'Acrylate', '4c':'Epoxy'}, inplace=True)
+particle_results.replace({'pentane':'Pentane', 'Napoly':'SPT', '2c':'Acrylate', '4c':'Epoxy'}, inplace=True)
 
-    wafer_results.to_csv('../wafer_results_{}.csv'.format(pd.datetime.today().strftime('%d-%m-%y_%H-%M')))
-    particle_results.to_csv('../particle_results_{}.csv'.format(pd.datetime.today().strftime('%d-%m-%y_%H-%M')))
+wafer_results.to_csv('../wafer_results_{}.csv'.format(pd.datetime.today().strftime('%d-%m-%y_%H-%M')))
+particle_results.to_csv('../particle_results_{}.csv'.format(pd.datetime.today().strftime('%d-%m-%y_%H-%M')))
 
-    t_final = round((time.time() - t_start) / 3600, ndigits=1)
-    print(f'All images processed. Total duration was {t_final} h.')
+t_final = round((time.time() - t_start) / 3600, ndigits=1)
+print(f'All images processed. Total duration was {t_final} h.')
