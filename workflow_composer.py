@@ -26,8 +26,8 @@ def process_image_pair(pre_image_path):
 
     post_image_path = os.path.join(path_post, f'{cwn}_{cwt}.tif')
 
-    statsBefore, statsAfter, indexMap, ratios = pm.runPM(pre_image_path, post_image_path)
-    indexMap_df = pd.DataFrame(indexMap, index=['ID_post']).transpose()
+    statsBefore, statsAfter, indexBefore2After, ratios = pm.runPM(pre_image_path, post_image_path)
+    indexMap_df = pd.DataFrame(indexBefore2After, index=['ID_post']).transpose()
     indexMap_df.reset_index(inplace=True)
     indexMap_df.rename(columns={'index': 'ID_pre'}, inplace=True)
 
@@ -50,7 +50,7 @@ def process_image_pair(pre_image_path):
     statsAfter.insert(0, 'wafer', cwn)
 
     tn = round((time.time() - t0) / 60, ndigits=1)
-    return tn, cwn, cwp, cwt, statsBefore, statsAfter, stats_combined, indexMap, ratios
+    return tn, cwn, cwp, cwt, statsBefore, statsAfter, stats_combined, indexBefore2After, ratios
 
 
 if __name__ == '__main__':
@@ -71,7 +71,7 @@ if __name__ == '__main__':
     with concurrent.futures.ProcessPoolExecutor() as executor:
         results = executor.map(process_image_pair, pre_paths)
         for result in results:
-            tn, cwn, cwp, cwt, statsBefore, statsAfter, stats_combined, indexMap, ratios = result
+            tn, cwn, cwp, cwt, statsBefore, statsAfter, stats_combined, indexBefore2After, ratios = result
 
             print(f'Images of {cwn} with {cwp} and {cwt} were completed after {tn} min.')
             wafer_results.at[cwn, 'pre_count'] = len(statsBefore)
