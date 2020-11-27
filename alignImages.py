@@ -79,20 +79,23 @@ def offSetPoints(points: np.ndarray, angle: float, shift: np.ndarray) -> np.ndar
     return pointsRot + shift
 
 
-def getIndicesAndErrosFromCenters(lessPoints: np.ndarray, morePoints: np.ndarray,
+def getIndicesAndErrosFromCenters(beforePoints: np.ndarray, afterPoints: np.ndarray,
                                   maxDistError: float = np.inf) -> Tuple[np.ndarray, Dict[int, int]]:
     """
     Calculates the distance of all centers and report the assignment of points in lessPoints to points in morePoints
-    :param lessPoints: (N x 2) shape array of x, y coordinates
-    :param morePoints: (M x 2) shape array of x, y coordinates, ideally M >= N
+    :param beforePoints: (N x 2) shape array of x, y coordinates
+    :param afterPoints: (M x 2) shape array of x, y coordinates, ideally M >= N
     :param maxDistError: maximum tolerated distance between points to be accepted as pairings
-    :return: tuple: error (float), list of indices mapping the shorter list of points to the longer list of points
+    :return: tuple: error (float), list of indices mapping particleIndices from before image to after image
     """
+    inverted: bool = False
+    morePoints, lessPoints = beforePoints, afterPoints
     if morePoints.shape[0] < lessPoints.shape[0]:
+        inverted = True
         morePoints, lessPoints = lessPoints, morePoints
 
     errors: List[float] = []
-    indices: Dict[int, int] = {}
+    indicesBefore2After: Dict[int, int] = {}
     distMat: np.ndarray = distance_matrix(lessPoints, morePoints)
 
     for _ in range(lessPoints.shape[0]):
@@ -102,12 +105,15 @@ def getIndicesAndErrosFromCenters(lessPoints: np.ndarray, morePoints: np.ndarray
         distMat[:, j] = np.inf  # effectively removes these indices from further consideration
 
         if minDist <= maxDistError:
-            indices[i] = j
+            if inverted:
+                indicesBefore2After[i] = j
+            else:
+                indicesBefore2After[j] = i
             errors.append(minDist)
         else:
             errors.append(100000)  # add a high penalty
 
-    return np.array(errors), indices
+    return np.array(errors), indicesBefore2After
 
 
 def getDiffOfAngleShift(angleShift: np.ndarray, origPoints: np.ndarray, knownDstPoints: np.ndarray,

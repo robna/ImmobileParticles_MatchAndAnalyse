@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 import time
 import numpy as np
 import pandas as pd
@@ -6,33 +7,24 @@ import concurrent.futures
 
 import runParticleMatching as pm
 
-t_start = time.time()
-t_start_formatted = time.strftime('%H:%M:%S', time.localtime(t_start))
-print(f'Start time is:   {t_start_formatted}')
+path_pre = r'C:\Users\xbrjos\Desktop\New folder\quantDigest_imageData\tif_pre_test'
+path_post = r'C:\Users\xbrjos\Desktop\New folder\quantDigest_imageData\tif_post'
 
+# These keys are required for each process, so we leave it here to have it accesible as global varibale in each process..
 keys = pd.read_csv('wafer-polymer-keyfile.csv', index_col='wafer')
 keys.dropna(inplace=True)
 keys.sort_values(by=['polymer', 'treatment'], inplace=True)  # sort the keys table after polymer and treatment
 
-wafer_results = keys.assign(pre_count=np.nan, post_count=np.nan, matched_count=np.nan,
-                            process_time=np.nan)  # prepare a results dataframe
-particle_results = pd.DataFrame()
-
-pre_paths = [item for item in Path(  # pathlib.Path.glob creates a generator, which is used to make a list of paths here
-    '/run/media/nibor/data_ext/quantDigest_imageData/tif_pre/').glob(  # enter path to pre image directory
-    '*.tif')]  # collect all tiff files from path
-
-pre_paths = sorted(pre_paths, key=lambda x: keys.index.get_loc(x.stem.split('_')[0]))  # sort paths like the key table
-
 
 def process_image_pair(pre_image_path):
     t0 = time.time()
+    print('processing', pre_image_path)
 
     cwn = pre_image_path.stem.split('_')[0]  # get current wafer name
     cwp = keys.loc[cwn]['polymer']  # get current wafer polymer
     cwt = keys.loc[cwn]['treatment']  # get current wafer treatment
 
-    post_image_path = f'/run/media/nibor/data_ext/quantDigest_imageData/tif_post/{cwn}_{cwt}.tif'
+    post_image_path = os.path.join(path_post, f'{cwn}_{cwt}.tif')
 
     statsBefore, statsAfter, indexMap, ratios = pm.runPM(pre_image_path, post_image_path)
     indexMap_df = pd.DataFrame(indexMap, index=['ID_post']).transpose()
@@ -58,21 +50,30 @@ def process_image_pair(pre_image_path):
     statsAfter.insert(0, 'wafer', cwn)
 
     tn = round((time.time() - t0) / 60, ndigits=1)
-    t0 = time.time()
-
     return tn, cwn, cwp, cwt, statsBefore, statsAfter, stats_combined, indexMap, ratios
 
 
 if __name__ == '__main__':
+    t_start = time.time()
+    t_start_formatted = time.strftime('%H:%M:%S', time.localtime(t_start))
+    print(f'Start time is:   {t_start_formatted}')
+
+    # prepare a results dataframe
+    wafer_results = keys.assign(pre_count=np.nan, post_count=np.nan, matched_count=np.nan, process_time=np.nan)
+    particle_results = pd.DataFrame()
+
+    # pathlib.Path.glob creates a generator, which is used to make a list of paths here
+    pre_paths = [item for item in Path(path_pre).glob('*.tif')]  # collect all tiff files from path
+
+    # sort paths like the key table
+    pre_paths = sorted(pre_paths, key=lambda x: keys.index.get_loc(x.stem.split('_')[0]))
 
     with concurrent.futures.ProcessPoolExecutor() as executor:
         results = executor.map(process_image_pair, pre_paths)
-
         for result in results:
             tn, cwn, cwp, cwt, statsBefore, statsAfter, stats_combined, indexMap, ratios = result
 
             print(f'Images of {cwn} with {cwp} and {cwt} were completed after {tn} min.')
-
             wafer_results.at[cwn, 'pre_count'] = len(statsBefore)
             wafer_results.at[cwn, 'post_count'] = len(statsAfter)
             wafer_results.at[cwn, 'matched_count'] = len(ratios)
@@ -80,11 +81,11 @@ if __name__ == '__main__':
 
             particle_results = particle_results.append(stats_combined)
 
-wafer_results.replace({'Napoly':'SPT', '2c':'Acrylate', '4c':'Epoxy'}, inplace=True)
-particle_results.replace({'Napoly':'SPT', '2c':'Acrylate', '4c':'Epoxy'}, inplace=True)
+    wafer_results.replace({'Napoly': 'SPT', '2c': 'Acrylate', '4c': 'Epoxy'}, inplace=True)
+    particle_results.replace({'Napoly': 'SPT', '2c': 'Acrylate', '4c': 'Epoxy'}, inplace=True)
 
-wafer_results.to_csv('../wafer_results_{}.csv'.format(pd.datetime.today().strftime('%d-%m-%y_%H-%M')))
-particle_results.to_csv('../particle_results_{}.csv'.format(pd.datetime.today().strftime('%d-%m-%y_%H-%M')))
+    wafer_results.to_csv('../wafer_results_{}.csv'.format(pd.datetime.today().strftime('%d-%m-%y_%H-%M')))
+    particle_results.to_csv('../particle_results_{}.csv'.format(pd.datetime.today().strftime('%d-%m-%y_%H-%M')))
 
-t_final = round((time.time() - t_start) / 3600, ndigits=1)
-print(f'All images processed. Total duration was {t_final} h.')
+    t_final = round((time.time() - t_start) / 3600, ndigits=1)
+    print(f'All images processed. Total duration was {t_final} h.')
