@@ -80,26 +80,28 @@ def measure_particles(colorImg: np.ndarray, labels_hyst: np.ndarray) -> pd.DataF
     Particles on input image are measured using the labeled regions and results are reported in a pandas dataframe
     """
     props = regionprops_table(labels_hyst, colorImg, properties=(
-        'label',
+        #'label',  # TODO: can be omitted if indexBefore2After has nothing to do with labels (which it seems like)
         'area',
         'perimeter',
-        'major_axis_length',
-        'minor_axis_length',
+        # 'major_axis_length',
+        # 'minor_axis_length',
         'mean_intensity',
-        'centroid',
-        'bbox'))
+        # 'centroid',
+        # 'bbox'#
+    ))
     df = pd.DataFrame(props)
     return df
 
 
 if __name__ == '__main__':
     # Pixel sizes of image
-    orgPxSize = 0.359343  # this is the length (and width) of one pixel in µm in the original CZI images in full resolution
+    orgPxSize = 0.35934295644272635  # this is the length (and width) of one pixel in µm in the original CZI images in full resolution
 
     # scaling = 0.1 #this is to downscale images for faster processing (set to 1.0 for no downscaling)
     df = pd.DataFrame()  # initialise empty dataframe for saving per-image particle measurments
     DF = pd.DataFrame()  # initialise empty dataframe collecting particle measurements from all images
-    keys = pd.read_csv('wafer-polymer-keyfile.csv',index_col='wafer') # table containing polymer type information for each wafer
+    keys = pd.read_csv('wafer-polymer-keyfile.csv',
+                       index_col='wafer')  # table containing polymer type information for each wafer
 
     # paths = pathlib.Path(r'C:\Users\xbrjos\Desktop\Bilderkennung Robin\TiffImages').rglob('*.tif')
     # paths = sorted([x for x in paths])
