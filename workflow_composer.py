@@ -42,6 +42,11 @@ def process_image_pair(pre_image_path):
     statsBefore.insert(0, 'polymer', cwp)
     statsBefore.insert(0, 'wafer', cwn)
 
+    # statsAfter.insert(0, 'file', post_image_path)  # not necessary, so commented out to make the stats df smaller
+    statsAfter.insert(0, 'treatment', cwt)
+    statsAfter.insert(0, 'polymer', cwp)
+    statsAfter.insert(0, 'wafer', cwn)
+
     statsBefore_wMap = statsBefore.join(indexMap_df)
     stats_combined = statsBefore_wMap.merge(statsAfter,
                                             left_on='postIndices',
@@ -49,18 +54,18 @@ def process_image_pair(pre_image_path):
                                             how='outer',
                                             suffixes=('_pre', '_post')
                                             )
+
+    for col in ['wafer', 'polymer', 'treatment']:
+        stats_combined[col + '_pre'].fillna(stats_combined[col + '_post'], inplace=True)
+        stats_combined.rename(columns={col+'_pre': col}, inplace=True)
+        stats_combined.drop(columns=[col+'_post'], inplace=True)
+
     # TODO: turn stats combined into multilevel column df like this:
     #  toplevel = [wafer,poly,treat,preIndices,postIndices, area     , peri     ,...]
     #  2ndlevel = [     ,    ,     ,          ,           , pre, post, pre, post,...]
 
-    #  only useful if statsAfter is to be used alone (currently stats_combined is used):
-    statsAfter.insert(0, 'file', post_image_path)
-    statsAfter.insert(0, 'treatment', cwt)
-    statsAfter.insert(0, 'polymer', cwp)
-    statsAfter.insert(0, 'wafer', cwn)
-
     tn = round((time.time() - t0) / 60, ndigits=1)
-    return tn, cwn, cwp, cwt, statsBefore, statsAfter, stats_combined, indexBefore2After, *ratios
+    return tn, cwn, cwp, cwt, statsBefore, statsAfter, stats_combined, indexBefore2After  # , *ratios
 
 
 # %%
