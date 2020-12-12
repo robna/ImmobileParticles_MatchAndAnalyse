@@ -3,7 +3,7 @@ import time
 import matplotlib.pyplot as plt
 from typing import TYPE_CHECKING
 from alignImages import *
-from detection_hysteresis import getLowerThresholdForImg, RecognitionParameters, measure_particles, getCorrectProperties
+from detection_hysteresis import getLowerThresholdForImg, RecognitionParameters, measure_particles
 from outputs import generateOutputGraphs, getRatioOfProperty
 if TYPE_CHECKING:
     import pandas as pd
@@ -64,21 +64,8 @@ def runPM(pathBeforeImg, pathAfterImg):
     # TODO: what is 'error' for?  --> Not used here, but it is important for finding the coordinate transform...
     _, indexBefore2After = getIndicesAndErrosFromCenters(transformedBefore, afterCenters, maxDistError)
 
-    statsBefore: 'pd.DataFrame' = measure_particles(beforeImg, beforeLabels)
-    statsAfter: 'pd.DataFrame' = measure_particles(afterImg, afterLabels)
-
-    areasBefore, perimetersBefore, intensitiesBefore = getCorrectProperties(beforeImg, beforeContours)
-    areasAfter, perimetersAfter, intensitiesAfter = getCorrectProperties(afterImg, afterContours)
-
-    assert len(beforeContours) == len(statsBefore)
-    assert len(afterContours) == len(statsAfter)
-
-    statsBefore["area"] = areasBefore
-    statsBefore["perimeter"] = perimetersBefore
-    statsBefore["mean_intensity"] = intensitiesBefore
-    statsAfter["area"] = areasAfter
-    statsAfter["perimeter"] = perimetersAfter
-    statsAfter["mean_intensity"] = intensitiesAfter
+    statsBefore: 'pd.DataFrame' = measure_particles(beforeImg, beforeContours)
+    statsAfter: 'pd.DataFrame' = measure_particles(afterImg, afterContours)
 
     if config["showPartImages"]:
         fig1, fig2 = generateOutputGraphs(beforeCenters, afterCenters, beforeContours, afterContours, beforeImg,

@@ -76,25 +76,7 @@ def identify_particles(img: np.ndarray, parameters: 'RecognitionParameters' = Re
     return labels_hyst, num_labels_hyst, hyst, mask_low, mask_high, high, low
 
 
-def measure_particles(colorImg: np.ndarray, labels_hyst: np.ndarray) -> pd.DataFrame:
-    """
-    Particles on input image are measured using the labeled regions and results are reported in a pandas dataframe
-    """
-    props = regionprops_table(labels_hyst, colorImg, properties=(
-        #'label',  # TODO: can be omitted if indexBefore2After has nothing to do with labels (which it seems like)
-        'area',
-        'perimeter',
-        # 'major_axis_length',
-        # 'minor_axis_length',
-        'mean_intensity',
-        # 'centroid',
-        # 'bbox'#
-    ))
-    df = pd.DataFrame(props)
-    return df
-
-
-def getCorrectProperties(grayImg: np.ndarray, contours: List[np.ndarray]) -> Tuple[List, List, List]:
+def measure_particles(grayImg: np.ndarray, contours: List[np.ndarray]) -> pd.DataFrame:
     """Calculate Area, Perimeter and avg. Intensity in correct order."""
     areas, perimeters, intensities = [], [], []
     for cnt in contours:
@@ -104,7 +86,11 @@ def getCorrectProperties(grayImg: np.ndarray, contours: List[np.ndarray]) -> Tup
         cv2.drawContours(mask, [cnt], 0, 255, -1)
         intensities.append(cv2.mean(grayImg, mask=mask))
 
-    return areas, perimeters, intensities
+    dataframe = pd.DataFrame()
+    dataframe["area"] = areas
+    dataframe["perimeter"] = perimeters
+    dataframe["intensities"] = intensities
+    return dataframe
 
 
 if __name__ == '__main__':
