@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import os
 import cv2
+from typing import List, Tuple
 from scipy import ndimage as ndi
 from skimage import filters, io
 from skimage.measure import regionprops_table
@@ -91,6 +92,19 @@ def measure_particles(colorImg: np.ndarray, labels_hyst: np.ndarray) -> pd.DataF
     ))
     df = pd.DataFrame(props)
     return df
+
+
+def getCorrectProperties(grayImg: np.ndarray, contours: List[np.ndarray]) -> Tuple[List, List, List]:
+    """Calculate Area, Perimeter and avg. Intensity in correct order."""
+    areas, perimeters, intensities = [], [], []
+    for cnt in contours:
+        areas.append(cv2.contourArea(cnt))
+        perimeters.append(cv2.arcLength(cnt, closed=True))
+        mask = np.zeros(grayImg.shape, np.uint8)
+        cv2.drawContours(mask, [cnt], 0, 255, -1)
+        intensities.append(cv2.mean(grayImg, mask=mask))
+
+    return areas, perimeters, intensities
 
 
 if __name__ == '__main__':

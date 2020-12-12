@@ -6,7 +6,7 @@ from typing import List, Tuple, Dict
 import detection_hysteresis as dh
 
 
-def getContours(labelsImg: np.ndarray, minArea: float, maxArea: float) -> List[np.ndarray]:
+def getContours(labelsImg: np.ndarray, minArea: float, maxArea: float) -> Tuple[List[np.ndarray], List[int]]:
     """
     Get Contours from labelled image
     :param labelsImg: the labelled image
@@ -16,11 +16,14 @@ def getContours(labelsImg: np.ndarray, minArea: float, maxArea: float) -> List[n
     """
     selectedContours: List[np.ndarray] = []
     binImg = np.uint8(labelsImg > 0)
+    skipIndices: List[int] = []
     contours, hierarchy = cv2.findContours(binImg, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_NONE)
     for i, cnt in enumerate(contours):
         if minArea <= cv2.contourArea(cnt) <= maxArea and hierarchy[0, i, 3] < 0 and hierarchy[0, i, 2] < 0:
             selectedContours.append(cnt)
-    return selectedContours
+        else:
+            skipIndices.append(i)
+    return selectedContours, skipIndices
 
 
 def getContourCenters(contourList: List[np.ndarray]) -> np.ndarray:
@@ -47,7 +50,10 @@ def getLabelsAndContoursFromImage(image: np.ndarray, params: dh.RecognitionParam
         params = dh.RecognitionParameters()
 
     labelsImg, *others = dh.identify_particles(image, params)
-    return labelsImg, getContours(labelsImg, params.minArea, params.maxArea)
+    contours, skipIndices = getContours(labelsImg, params.minArea, params.maxArea)
+    for i in skipIndices:
+        labelsImg[labelsImg == i+1] = 0
+    return labelsImg, contours
 
 
 def getContourCentersFromImage(image: np.ndarray, params: dh.RecognitionParameters = dh.RecognitionParameters()) -> np.ndarray:

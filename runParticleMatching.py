@@ -1,10 +1,10 @@
 from skimage import io
 import time
+import matplotlib.pyplot as plt
 from typing import TYPE_CHECKING
 from alignImages import *
-from detection_hysteresis import getLowerThresholdForImg, RecognitionParameters, measure_particles
-from outputs import generateOutputGraphs  # , getRatioOfProperty
-
+from detection_hysteresis import getLowerThresholdForImg, RecognitionParameters, measure_particles, getCorrectProperties
+from outputs import generateOutputGraphs, getRatioOfProperty
 if TYPE_CHECKING:
     import pandas as pd
 
@@ -15,7 +15,7 @@ px_res_orig = 0.35934295644272635  # µm / px in original resolution of microsco
 pyr_lev = 2  # used image level of the pyramid image data from CZI images
 px_res = px_res_orig * pyr_lev  # pixel resolution [µm / px] of the images that were effectively used
 
-config = {"imgScaleFactor": 1,  # (0...1.0)
+config = {"imgScaleFactor": 1.0,  # (0...1.0)
           "minParticleArea": 152,  # ~ ESD 10 µm     # in px**2  TODO: is "squarepixel" correct here? shouldn't it just be "pixel"
           "maxParticleArea": 15206,  # ~ ESD 100 µm  # in px**2
           "hystHighThresh": 0.75,  # relative to maximum intensity
@@ -61,18 +61,30 @@ def runPM(pathBeforeImg, pathAfterImg):
     afterCenters = getContourCenters(afterContours)
 
     transformedBefore: np.ndarray = offSetPoints(beforeCenters, angle, shift)
-    # TODO: what is 'error' for?
-    error, indexBefore2After = getIndicesAndErrosFromCenters(transformedBefore, afterCenters, maxDistError)
+    # TODO: what is 'error' for?  --> Not used here, but it is important for finding the coordinate transform...
+    _, indexBefore2After = getIndicesAndErrosFromCenters(transformedBefore, afterCenters, maxDistError)
 
     statsBefore: 'pd.DataFrame' = measure_particles(beforeImg, beforeLabels)
     statsAfter: 'pd.DataFrame' = measure_particles(afterImg, afterLabels)
-    # Ratios are now calculated in the result_plots notebook, so here I commented it out to save computation time
-    # ratios: np.ndarray = getRatioOfProperty(config["property"], statsBefore, statsAfter, indexBefore2After)
+
+    areasBefore, perimetersBefore, intensitiesBefore = getCorrectProperties(beforeImg, beforeContours)
+    areasAfter, perimetersAfter, intensitiesAfter = getCorrectProperties(afterImg, afterContours)
+
+    assert len(beforeContours) == len(statsBefore)
+    assert len(afterContours) == len(statsAfter)
+
+    statsBefore["area"] = areasBefore
+    statsBefore["perimeter"] = perimetersBefore
+    statsBefore["mean_intensity"] = intensitiesBefore
+    statsAfter["area"] = areasAfter
+    statsAfter["perimeter"] = perimetersAfter
+    statsAfter["mean_intensity"] = intensitiesAfter
 
     if config["showPartImages"]:
         fig1, fig2 = generateOutputGraphs(beforeCenters, afterCenters, beforeContours, afterContours, beforeImg,
                                           afterImg, 'before', 'after', indexBefore2After)
         fig1.show()
         fig2.show()
+        plt.show(block=True)
 
-    return statsBefore, statsAfter, indexBefore2After  # , ratios
+    return statsBefore, statsAfter, indexBefore2After # , ratios
