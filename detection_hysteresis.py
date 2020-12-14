@@ -84,7 +84,7 @@ def measure_particles(grayImg: np.ndarray, contours: List[np.ndarray]) -> pd.Dat
         perimeters.append(cv2.arcLength(cnt, closed=True))
         mask = np.zeros(grayImg.shape, np.uint8)
         cv2.drawContours(mask, [cnt], 0, 255, -1)
-        intensities.append(cv2.mean(grayImg, mask=mask))
+        intensities.append(cv2.mean(grayImg, mask=mask)[0])  # cv2.mean returns rgba-tuple, we only have grayscale, so only take first index
 
     dataframe = pd.DataFrame()
     dataframe["area"] = areas
