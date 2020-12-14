@@ -20,7 +20,7 @@ def generateOutputGraphs(sourceCenters: np.ndarray, dstCenters: np.ndarray,
     dstImg = cv2.cvtColor(dstImg, cv2.COLOR_GRAY2RGB)
     dstImgMarkovers = np.zeros_like(dstImg)
 
-    # first draw colored contours
+    # now fill matched particles with color
     numParticlesMatched = len(indicesBeforeAfter)
     colorStep = 1 / numParticlesMatched
     hue = 0
@@ -41,6 +41,10 @@ def generateOutputGraphs(sourceCenters: np.ndarray, dstCenters: np.ndarray,
     srcImg = np.uint8(np.round(0.5 * srcImg + 0.5 * srcimgMarkovers))
     dstImg = np.uint8(np.round(0.5 * dstImg + 0.5 * dstImgMarkovers))
 
+    # draw all contours with white outline
+    cv2.drawContours(srcImg, sourceContours, -1, (255, 255, 255), 2)
+    cv2.drawContours(dstImg, dstContours, -1, (255, 255, 255), 2)
+
     # now add numbers
     fontSize = int(round(srcImg.shape[0] / 300))
     for origInd, targetInd in indicesBeforeAfter.items():
@@ -58,7 +62,7 @@ def generateOutputGraphs(sourceCenters: np.ndarray, dstCenters: np.ndarray,
 
     fig2 = plt.figure()
     ax2 = fig2.add_subplot()
-    ax2.set_title(f'{len(indicesBeforeAfter)} of {dstCenters.shape[0]} particles on {dstName}')
+    ax2.set_title(f'{len(indicesBeforeAfter)} of {dstCenters.shape[0]} particles on {dstName} treatment image')
     ax2.imshow(dstImg, cmap='gray')
     fig2.tight_layout()
     return fig1, fig2
