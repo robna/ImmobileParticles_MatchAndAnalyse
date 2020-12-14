@@ -61,7 +61,6 @@ def runPM(pathBeforeImg, pathAfterImg):
     afterCenters = getContourCenters(afterContours)
 
     transformedBefore: np.ndarray = offSetPoints(beforeCenters, angle, shift)
-    # TODO: what is 'error' for?  --> Not used here, but it is important for finding the coordinate transform...
     _, indexBefore2After = getIndicesAndErrosFromCenters(transformedBefore, afterCenters, maxDistError)
 
     statsBefore: 'pd.DataFrame' = measure_particles(beforeImg, beforeContours)

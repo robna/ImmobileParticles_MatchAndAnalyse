@@ -13,6 +13,10 @@ keys = pd.read_csv('wafer-polymer-keyfile.csv', index_col='wafer')
 keys.dropna(inplace=True)
 keys.sort_values(by=['polymer', 'treatment'], inplace=True)  # sort the keys table after polymer and treatment
 
+pre_directory = r'C:\Users\xbrjos\Desktop\New folder\quantDigest_imageData\tif_pre_test'  # Josefs paths
+post_directory = r'C:\Users\xbrjos\Desktop\New folder\quantDigest_imageData\tif_post'  # Josefs paths
+# pre_directory = r'/run/media/nibor/data_ext/quantDigest_imageData/tif_pre/'  # Robins paths
+# post_directory = r'/run/media/nibor/data_ext/quantDigest_imageData/tif_post/'  # Robins paths
 
 # %%
 def process_image_pair(pre_image_path):
@@ -26,23 +30,19 @@ def process_image_pair(pre_image_path):
 
     statsBefore, statsAfter, indexBefore2After, *_ = pm.runPM(pre_image_path, post_image_path)
     # TODO: check + solve label / index issue
+    # TODO: Josef asks: What does that mean?? Can we delete that?
     # statsBefore.set_index('label', inplace=True)  # activate if entries in indexBefore2After corresponds to labels
     # statsAfter.set_index('label', inplace=True)  # activate if entries in indexBefore2After corresponds to labels
 
     indexMap_df = pd.DataFrame(indexBefore2After, index=['postIndices']).transpose()
     indexMap_df.reset_index(inplace=True)
     indexMap_df.rename(columns={'index': 'preIndices'}, inplace=True)
-    # TODO: guess this is not needed anymore, as indexBefore2After has fixed order now:
-    # if len(statsBefore) > len(statsAfter):
-    #    indexMap_df.columns = indexMap_df.columns[::-1]
     indexMap_df.set_index('preIndices', inplace=True)
 
-    # statsBefore.insert(0, 'file', pre_image_path)  # not necessary, so commented out to make the stats df smaller
     statsBefore.insert(0, 'treatment', cwt)
     statsBefore.insert(0, 'polymer', cwp)
     statsBefore.insert(0, 'wafer', cwn)
 
-    # statsAfter.insert(0, 'file', post_image_path)  # not necessary, so commented out to make the stats df smaller
     statsAfter.insert(0, 'treatment', cwt)
     statsAfter.insert(0, 'polymer', cwp)
     statsAfter.insert(0, 'wafer', cwn)
@@ -77,11 +77,6 @@ if __name__ == '__main__':
     # prepare a results dataframe
     wafer_results = keys.assign(pre_count=np.nan, post_count=np.nan, matched_count=np.nan, process_time=np.nan)
     particle_results = pd.DataFrame()
-
-    # pre_directory = r'C:\Users\xbrjos\Desktop\New folder\quantDigest_imageData\tif_pre_test'  # Josefs paths
-    # post_directory = r'C:\Users\xbrjos\Desktop\New folder\quantDigest_imageData\tif_post'  # Josefs paths
-    pre_directory = r'/run/media/nibor/data_ext/quantDigest_imageData/tif_pre/'  # Robins paths
-    post_directory = r'/run/media/nibor/data_ext/quantDigest_imageData/tif_post/'  # Robins paths
 
     pre_paths = [item for item in
                  Path(  # pathlib.Path.glob creates a generator, which is used to make a list of paths here
