@@ -6,6 +6,8 @@ from typing import List
 from scipy import ndimage as ndi
 from skimage import filters, io
 from skimage.morphology import binary_closing, disk
+import base64
+
 import datetime
 
 
@@ -73,16 +75,21 @@ def identify_particles(img: np.ndarray, parameters: 'RecognitionParameters' = Re
 
 def measure_particles(grayImg: np.ndarray, contours: List[np.ndarray]) -> pd.DataFrame:
     """Calculate Area, Perimeter and avg. Intensity in correct order."""
-    areas, perimeters, intensities = [], [], []
+    areas, perimeters, intensities, snip = [], [], [], []
     for cnt in contours:
         areas.append(cv2.contourArea(cnt))
         perimeters.append(cv2.arcLength(cnt, closed=True))
         mask = np.zeros(grayImg.shape, np.uint8)
         cv2.drawContours(mask, [cnt], 0, 255, -1)
-        intensities.append(cv2.mean(grayImg, mask=mask)[0])  # cv2.mean returns rgba-tuple, we only have grayscale, so only take first index
+        intensities.append(cv2.mean(grayImg, mask=mask)[0])  # we only have grayscale, so only take first index [0]
+        x, y, w, h = cv2.boundingRect(cnt)  # we get x, y, width and height of the bounding box for the contour
+        snipslice = grayImg[y - 5:y + h + 5, x - 5:x + w + 5]  # extract the part of the image that is within bb + 5 px
+        snip.append(base64.b64encode(np.ascontiguousarray(snipslice)))  # save extracted particle image as string
+
 
     dataframe = pd.DataFrame()
     dataframe["area"] = areas
     dataframe["perimeter"] = perimeters
-    dataframe["intensities"] = intensities
+    dataframe["intensity"] = intensities
+    dataframe["snip"] = snip
     return dataframe

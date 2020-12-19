@@ -13,10 +13,10 @@ keys = pd.read_csv('wafer-polymer-keyfile.csv', index_col='wafer')
 keys.dropna(inplace=True)
 keys.sort_values(by=['polymer', 'treatment'], inplace=True)  # sort the keys table after polymer and treatment
 
-pre_directory = r'C:\Users\xbrjos\Desktop\New folder\quantDigest_imageData\tif_pre_test'  # Josefs paths
-post_directory = r'C:\Users\xbrjos\Desktop\New folder\quantDigest_imageData\tif_post'  # Josefs paths
-# pre_directory = r'/run/media/nibor/data_ext/quantDigest_imageData/tif_pre/'  # Robins paths
-# post_directory = r'/run/media/nibor/data_ext/quantDigest_imageData/tif_post/'  # Robins paths
+# pre_directory = r'C:\Users\xbrjos\Desktop\New folder\quantDigest_imageData\tif_pre_test'  # Josefs paths
+# post_directory = r'C:\Users\xbrjos\Desktop\New folder\quantDigest_imageData\tif_post'  # Josefs paths
+pre_directory = r'/run/media/nibor/data_ext/quantDigest_imageData/tif_pre/'  # Robins paths
+post_directory = r'/run/media/nibor/data_ext/quantDigest_imageData/tif_post/'  # Robins paths
 
 # %%
 def process_image_pair(pre_image_path):
@@ -29,10 +29,6 @@ def process_image_pair(pre_image_path):
     post_image_path = os.path.join(post_directory, f'{cwn}_{cwt}.tif')
 
     statsBefore, statsAfter, indexBefore2After, *_ = pm.runPM(pre_image_path, post_image_path)
-    # TODO: check + solve label / index issue
-    # TODO: Josef asks: What does that mean?? Can we delete that?
-    # statsBefore.set_index('label', inplace=True)  # activate if entries in indexBefore2After corresponds to labels
-    # statsAfter.set_index('label', inplace=True)  # activate if entries in indexBefore2After corresponds to labels
 
     indexMap_df = pd.DataFrame(indexBefore2After, index=['postIndices']).transpose()
     indexMap_df.reset_index(inplace=True)
@@ -59,10 +55,6 @@ def process_image_pair(pre_image_path):
         stats_combined[col + '_pre'].fillna(stats_combined[col + '_post'], inplace=True)
         stats_combined.rename(columns={col+'_pre': col}, inplace=True)
         stats_combined.drop(columns=[col+'_post'], inplace=True)
-
-    # TODO: turn stats combined into multilevel column df like this:
-    #  toplevel = [wafer,poly,treat,preIndices,postIndices, area     , peri     ,...]
-    #  2ndlevel = [     ,    ,     ,          ,           , pre, post, pre, post,...]
 
     tn = round((time.time() - t0) / 60, ndigits=1)
     return tn, cwn, cwp, cwt, statsBefore, statsAfter, stats_combined, indexBefore2After  # , *ratios

@@ -1,10 +1,12 @@
 from skimage import io
+from skimage import exposure
 import time
 import matplotlib.pyplot as plt
 from typing import TYPE_CHECKING
 from alignImages import *
 from detection_hysteresis import getLowerThresholdForImg, RecognitionParameters, measure_particles
 from outputs import generateOutputGraphs, getRatioOfProperty
+
 if TYPE_CHECKING:
     import pandas as pd
 
@@ -16,7 +18,8 @@ pyr_lev = 2  # used image level of the pyramid image data from CZI images
 px_res = px_res_orig * pyr_lev  # pixel resolution [µm / px] of the images that were effectively used
 
 config = {"imgScaleFactor": 1.0,  # (0...1.0)
-          "minParticleArea": 152,  # ~ ESD 10 µm     # in px**2  TODO: is "squarepixel" correct here? shouldn't it just be "pixel"
+          "minParticleArea": 152,
+          # ~ ESD 10 µm     # in px**2  TODO: is "squarepixel" correct here? shouldn't it just be "pixel"
           "maxParticleArea": 15206,  # ~ ESD 100 µm  # in px**2
           "hystHighThresh": 0.75,  # relative to maximum intensity
           "particleDistTolerance": 3,  # in percent (0...100)
@@ -34,6 +37,8 @@ def runPM(pathBeforeImg, pathAfterImg):
 
     beforeImg = cv2.medianBlur(beforeImg, ksize=9)
     afterImg = cv2.medianBlur(afterImg, ksize=9)
+
+    beforeImg = exposure.match_histograms(beforeImg, afterImg)
 
     params: RecognitionParameters = RecognitionParameters()
     params.highTreshold = config["hystHighThresh"]
@@ -73,4 +78,4 @@ def runPM(pathBeforeImg, pathAfterImg):
         fig2.show()
         plt.show(block=True)
 
-    return statsBefore, statsAfter, indexBefore2After # , ratios
+    return statsBefore, statsAfter, indexBefore2After  # , ratios
