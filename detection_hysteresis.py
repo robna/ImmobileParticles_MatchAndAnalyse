@@ -1,14 +1,11 @@
 import numpy as np
 import pandas as pd
-import os
 import cv2
 from typing import List
 from scipy import ndimage as ndi
 from skimage import filters, io
 from skimage.morphology import binary_closing, disk
 import base64
-
-import datetime
 
 
 class RecognitionParameters(object):
@@ -73,9 +70,9 @@ def identify_particles(img: np.ndarray, parameters: 'RecognitionParameters' = Re
     return labels_hyst, num_labels_hyst, hyst, mask_low, mask_high, high, low
 
 
-def measure_particles(grayImg: np.ndarray, contours: List[np.ndarray]) -> pd.DataFrame:
+def measure_particles(grayImg: np.ndarray, contours: List[np.ndarray], um_per_px=1) -> pd.DataFrame:
     """Calculate Area, Perimeter and avg. Intensity in correct order."""
-    areas, perimeters, intensities, snip = [], [], [], []
+    areas, perimeters, intensities, snips, snipWs, snipHs = [], [], [], [], [], []
     for cnt in contours:
         areas.append(cv2.contourArea(cnt))
         perimeters.append(cv2.arcLength(cnt, closed=True))
@@ -83,13 +80,33 @@ def measure_particles(grayImg: np.ndarray, contours: List[np.ndarray]) -> pd.Dat
         cv2.drawContours(mask, [cnt], 0, 255, -1)
         intensities.append(cv2.mean(grayImg, mask=mask)[0])  # we only have grayscale, so only take first index [0]
         x, y, w, h = cv2.boundingRect(cnt)  # we get x, y, width and height of the bounding box for the contour
-        snipslice = grayImg[y - 5:y + h + 5, x - 5:x + w + 5]  # extract the part of the image that is within bb + 5 px
-        snip.append(base64.b64encode(np.ascontiguousarray(snipslice)))  # save extracted particle image as string
+        snipWs.append(w)
+        snipHs.append(h)
+        snipslice = grayImg[
+                    y - 0:y + h + 0,
+                    x - 0:x + w + 0].astype('uint8')  # extract the part of the image that is within bb + X px each way
+        SBl = 10  # length of scale bar in µm
+        SBc = 255  # colour of scale bar
+        SBw = round(SBl / um_per_px)  # width of scale bar in px
+        SBh = 5  # height of scale bar in px
+        SBx = round(snipslice.shape[1]* 0.1)
+        SBy = round(snipslice.shape[0] * 0.9)
+        if SBx + SBw <= snipslice.shape[1]:
+            snipslice[SBy - SBh:SBy, SBx:SBx + SBw] = SBc
+        else:
+            snipslice[SBy - SBh:SBy, SBx:] = SBc
+        _, buffer = cv2.imencode('.png', np.ascontiguousarray(snipslice))
+        snip64 = base64.b64encode(buffer).decode()
+        snip64formatted = 'data:image/png;base64,{}'.format(snip64)
+        snips.append(snip64formatted)  # save extracted particle image as base64 encoded png
+        # snip.append([snipslice])  # alternative: save extracted particle image as array
 
 
     dataframe = pd.DataFrame()
     dataframe["area"] = areas
     dataframe["perimeter"] = perimeters
     dataframe["intensity"] = intensities
-    dataframe["snip"] = snip
+    dataframe["snip"] = snips
+    dataframe["snipW"] = [W + 0 for W in snipWs]  # width plus 2 x padding, which was set when taking snipslice
+    dataframe["snipH"] = [H + 0 for H in snipHs]  # height plus 2 x padding, which was set when taking snipslice
     return dataframe

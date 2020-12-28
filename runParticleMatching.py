@@ -68,8 +68,8 @@ def runPM(pathBeforeImg, pathAfterImg):
     transformedBefore: np.ndarray = offSetPoints(beforeCenters, angle, shift)
     _, indexBefore2After = getIndicesAndErrosFromCenters(transformedBefore, afterCenters, maxDistError)
 
-    statsBefore: 'pd.DataFrame' = measure_particles(beforeImg, beforeContours)
-    statsAfter: 'pd.DataFrame' = measure_particles(afterImg, afterContours)
+    statsBefore: 'pd.DataFrame' = measure_particles(beforeImg, beforeContours, um_per_px=px_res)
+    statsAfter: 'pd.DataFrame' = measure_particles(afterImg, afterContours, um_per_px=px_res)
 
     if config["showPartImages"]:
         fig1, fig2 = generateOutputGraphs(beforeCenters, afterCenters, beforeContours, afterContours, beforeImg,
