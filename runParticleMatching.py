@@ -32,13 +32,16 @@ def runPM(pathBeforeImg, pathAfterImg):
     beforeImg: np.ndarray = io.imread(pathBeforeImg)
     afterImg: np.ndarray = io.imread(pathAfterImg)
 
-    beforeImg = cv2.resize(beforeImg, None, fx=config["imgScaleFactor"], fy=config["imgScaleFactor"])
-    afterImg = cv2.resize(afterImg, None, fx=config["imgScaleFactor"], fy=config["imgScaleFactor"])
+    beforeImg = exposure.match_histograms(beforeImg, afterImg).astype(np.uint8)
+
+    beforeImg_nonBlur = cv2.resize(beforeImg, None, fx=config["imgScaleFactor"], fy=config["imgScaleFactor"])
+    afterImg_nonBlur = cv2.resize(afterImg, None, fx=config["imgScaleFactor"], fy=config["imgScaleFactor"])
+
+    beforeMax = np.argmax(cv2.calcHist([beforeImg_nonBlur], [0], None, [256], [0, 256])[1:-50])  # find most abundant background grey value
+    afterMax = np.argmax(cv2.calcHist([afterImg_nonBlur], [0], None, [256], [0, 256])[1:-50])
 
     beforeImg = cv2.medianBlur(beforeImg, ksize=9)
     afterImg = cv2.medianBlur(afterImg, ksize=9)
-
-    beforeImg = exposure.match_histograms(beforeImg, afterImg)
 
     params: RecognitionParameters = RecognitionParameters()
     params.highTreshold = config["hystHighThresh"]
@@ -68,8 +71,8 @@ def runPM(pathBeforeImg, pathAfterImg):
     transformedBefore: np.ndarray = offSetPoints(beforeCenters, angle, shift)
     _, indexBefore2After = getIndicesAndErrosFromCenters(transformedBefore, afterCenters, maxDistError)
 
-    statsBefore: 'pd.DataFrame' = measure_particles(beforeImg, beforeContours, um_per_px=px_res)
-    statsAfter: 'pd.DataFrame' = measure_particles(afterImg, afterContours, um_per_px=px_res)
+    statsBefore: 'pd.DataFrame' = measure_particles(beforeImg_nonBlur, beforeContours, um_per_px=px_res)
+    statsAfter: 'pd.DataFrame' = measure_particles(afterImg_nonBlur, afterContours, um_per_px=px_res)
 
     if config["showPartImages"]:
         fig1, fig2 = generateOutputGraphs(beforeCenters, afterCenters, beforeContours, afterContours, beforeImg,
@@ -78,4 +81,4 @@ def runPM(pathBeforeImg, pathAfterImg):
         fig2.show()
         plt.show(block=True)
 
-    return statsBefore, statsAfter, indexBefore2After  # , ratios
+    return statsBefore, statsAfter, indexBefore2After, beforeMax, afterMax  # , ratios

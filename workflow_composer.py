@@ -29,7 +29,7 @@ def process_image_pair(pre_image_path):
 
     post_image_path = os.path.join(post_directory, f'{cwn}_{cwt}.tif')
 
-    statsBefore, statsAfter, indexBefore2After, *_ = pm.runPM(pre_image_path, post_image_path)
+    statsBefore, statsAfter, indexBefore2After, beforeMax, afterMax, *_ = pm.runPM(pre_image_path, post_image_path)
 
     indexMap_df = pd.DataFrame(indexBefore2After, index=['postIndex']).transpose()
     indexMap_df.reset_index(inplace=True)
@@ -61,7 +61,7 @@ def process_image_pair(pre_image_path):
     stats_combined.rename(columns={'index': 'preIndex'}, inplace=True)
 
     tn = round((time.time() - t0) / 60, ndigits=1)
-    return tn, cwn, cwp, cwt, statsBefore, statsAfter, stats_combined, indexBefore2After  # , *ratios
+    return tn, cwn, cwp, cwt, statsBefore, statsAfter, stats_combined, indexBefore2After, beforeMax, afterMax  # , *ratios
 
 
 # %%
@@ -71,7 +71,7 @@ if __name__ == '__main__':
     print(f'Start time is:   {t_start_formatted}')
 
     # prepare a results dataframe
-    wafer_results = keys.assign(pre_count=np.nan, post_count=np.nan, matched_count=np.nan, process_time=np.nan)
+    wafer_results = keys.assign(pre_count=np.nan, post_count=np.nan, matched_count=np.nan, pre_background=np.nan, post_background=np.nan, process_time=np.nan)
     particle_results = pd.DataFrame()
     particle_snips = pd.DataFrame()
 
@@ -87,11 +87,13 @@ if __name__ == '__main__':
     with concurrent.futures.ProcessPoolExecutor() as executor:
         results = executor.map(process_image_pair, pre_paths)
         for result in results:
-            tn, cwn, cwp, cwt, statsBefore, statsAfter, stats_combined, indexBefore2After, *ratios = result
+            tn, cwn, cwp, cwt, statsBefore, statsAfter, stats_combined, indexBefore2After, beforeMax, afterMax, *ratios = result
 
             wafer_results.at[cwn, 'pre_count'] = len(statsBefore)
             wafer_results.at[cwn, 'post_count'] = len(statsAfter)
             wafer_results.at[cwn, 'matched_count'] = len(indexBefore2After)
+            wafer_results.at[cwn, 'pre_background'] = beforeMax
+            wafer_results.at[cwn, 'post_background'] = afterMax
             wafer_results.at[cwn, 'process_time'] = tn
 
             particle_snip = stats_combined[[
