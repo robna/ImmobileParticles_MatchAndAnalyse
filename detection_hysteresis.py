@@ -5,7 +5,8 @@ from typing import List
 from scipy import ndimage as ndi
 from skimage import filters, io
 from skimage.morphology import binary_closing, disk
-import base64
+from outputs import npImgArray_to_base64png
+
 
 
 class RecognitionParameters(object):
@@ -86,18 +87,21 @@ def measure_particles(grayImg: np.ndarray, contours: List[np.ndarray], um_per_px
                     y - 0:y + h + 0,
                     x - 0:x + w + 0].astype('uint8')  # extract the part of the image that is within bb + X px each way
         SBl = 10  # length of scale bar in µm
-        SBc = 255  # colour of scale bar
         SBw = round(SBl / um_per_px)  # width of scale bar in px
         SBh = 5  # height of scale bar in px
-        SBx = round(snipslice.shape[1]* 0.1)
-        SBy = round(snipslice.shape[0] * 0.9)
-        if SBx + SBw <= snipslice.shape[1]:
-            snipslice[SBy - SBh:SBy, SBx:SBx + SBw] = SBc
+        SBx = round(snipslice.shape[1]* 0.1)  # find the x position to start the scale bar
+        SBy = round(snipslice.shape[0] * 0.9)  # find the y position to start the scale bar
+        if SBx + SBw <= snipslice.shape[1]:  # test if scale bar would fit snip image width
+            if snipslice[SBy - SBh:SBy, SBx:SBx + SBw].mean() <= 127:
+                snipslice[SBy - SBh:SBy, SBx:SBx + SBw] = 255  # make white scale bar where background is dark
+            else:  # make scale bar go across whole snip image if it does not fit
+                snipslice[SBy - SBh:SBy, SBx:SBx + SBw] = 0  # make white scale bar where background is bright
         else:
-            snipslice[SBy - SBh:SBy, SBx:] = SBc
-        _, buffer = cv2.imencode('.png', np.ascontiguousarray(snipslice))
-        snip64 = base64.b64encode(buffer).decode()
-        snip64formatted = 'data:image/png;base64,{}'.format(snip64)
+            if snipslice[SBy - SBh:SBy, SBx:].mean() <= 127:
+                snipslice[SBy - SBh:SBy, SBx:] = 255  # make white scale bar where background is dark
+            else:
+                snipslice[SBy - SBh:SBy, SBx:] = 0  # make white scale bar where background is bright
+        snip64formatted = npImgArray_to_base64png(snipslice)  # convert extracted snip image to base64 encoded png
         snips.append(snip64formatted)  # save extracted particle image as base64 encoded png
         # snip.append([snipslice])  # alternative: save extracted particle image as array
 
