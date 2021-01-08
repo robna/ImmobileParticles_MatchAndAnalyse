@@ -30,7 +30,8 @@ config = {"imgScaleFactor": 1.0,  # (0...1.0)
           "hystHighThresh": 0.75,  # relative to maximum intensity
           "particleDistTolerance": 3,  # in percent (0...100)
           "property": "area",  # the property to calculate the after/before ratio of
-          "showPartImages": True  # whether or not to show the found and paired particles in before and after image
+          "showPartImages": True,  # whether or not to show the found and paired particles in before and after image
+          "multiprocessing": False
           }
 
 
@@ -43,9 +44,6 @@ def runPM(pathBeforeImg, pathAfterImg):
     beforeImg_nonBlur = cv2.resize(beforeImg, None, fx=config["imgScaleFactor"], fy=config["imgScaleFactor"])
     afterImg_nonBlur = cv2.resize(afterImg, None, fx=config["imgScaleFactor"], fy=config["imgScaleFactor"])
 
-    beforeMax = np.argmax(cv2.calcHist([beforeImg_nonBlur], [0], None, [256], [0, 256])[1:-50])  # find most abundant background grey value
-    afterMax = np.argmax(cv2.calcHist([afterImg_nonBlur], [0], None, [256], [0, 256])[1:-50])
-
     beforeImg = cv2.medianBlur(beforeImg, ksize=9)
     afterImg = cv2.medianBlur(afterImg, ksize=9)
 
@@ -56,11 +54,19 @@ def runPM(pathBeforeImg, pathAfterImg):
     params.maxArea = config["maxParticleArea"]
     params.doHysteresis = False  # Don't do hysteresis first, just to get all particles (better for getting transform)
 
-    _, beforeContours = getLabelsAndContoursFromImage(beforeImg, params)
+    _, beforeContours, beforeLowerTH = getLabelsAndContoursFromImage(beforeImg, params)
     beforeCenters: np.ndarray = getContourCenters(beforeContours)
 
-    _, afterContours = getLabelsAndContoursFromImage(afterImg, params)
+    _, afterContours, afterLowerTH = getLabelsAndContoursFromImage(afterImg, params)
     afterCenters: np.ndarray = getContourCenters(afterContours)
+
+    beforeMaxBG = np.argmax(cv2.calcHist([beforeImg_nonBlur], [0], None, [256], [0, 256])[1:beforeLowerTH]) + 1  # find most abundant background grey value
+    afterMaxBG = np.argmax(cv2.calcHist([afterImg_nonBlur], [0], None, [256], [0, 256])[1:afterLowerTH]) + 1
+    beforeMaxFG = np.argmax(cv2.calcHist([beforeImg_nonBlur], [0], None, [256], [0, 256])[beforeLowerTH:-1]) + 128  # find most abundant foreground grey value
+    afterMaxFG = np.argmax(cv2.calcHist([afterImg_nonBlur], [0], None, [256], [0, 256])[afterLowerTH:-1]) + 128
+
+    beforeMax = (beforeMaxBG, beforeMaxFG)
+    afterMax = (afterMaxBG, afterMaxFG)
 
     ymin, ymax = beforeCenters[:, 1].min(), beforeCenters[:, 1].max()
     maxDistError = (ymax - ymin) * config["particleDistTolerance"] / 100
@@ -69,9 +75,9 @@ def runPM(pathBeforeImg, pathAfterImg):
 
     # No get only the relevant particles
     params.doHysteresis = True
-    beforeLabels, beforeContours = getLabelsAndContoursFromImage(beforeImg, params)
+    beforeLabels, beforeContours, *_ = getLabelsAndContoursFromImage(beforeImg, params)
     beforeCenters = getContourCenters(beforeContours)
-    afterLabels, afterContours = getLabelsAndContoursFromImage(afterImg, params)
+    afterLabels, afterContours, *_ = getLabelsAndContoursFromImage(afterImg, params)
     afterCenters = getContourCenters(afterContours)
 
     transformedBefore: np.ndarray = offSetPoints(beforeCenters, angle, shift)
@@ -80,7 +86,7 @@ def runPM(pathBeforeImg, pathAfterImg):
     statsBefore: 'pd.DataFrame' = measure_particles(beforeImg_nonBlur, beforeContours, um_per_px=px_res)
     statsAfter: 'pd.DataFrame' = measure_particles(afterImg_nonBlur, afterContours, um_per_px=px_res)
 
-    if config["showPartImages"]:
+    if config["showPartImages"] and beforeImg.size < 100_000_000 and afterImg.size < 100_000_000:  # check that image size does not exceed 100 MB
         # fig1, fig2 = generateOutputGraphs(beforeCenters, afterCenters, beforeContours, afterContours, beforeImg,
         #                                   afterImg, 'before', 'after', indexBefore2After)
         # fig1.show()
@@ -90,7 +96,7 @@ def runPM(pathBeforeImg, pathAfterImg):
                                           afterImg, 'before', 'after', indexBefore2After)
 
         def output_image_resizing(img):
-            width = 800  # output image width should be 600 px
+            width = 800  # output image width should be 800 px
             scaling = width / img.shape[1]
             height = round(img.shape[0] * scaling)  # scale height proportionally
             dim = (width, height)
@@ -99,7 +105,12 @@ def runPM(pathBeforeImg, pathAfterImg):
         srcImg = cv2.resize(srcImg, output_image_resizing(srcImg), interpolation = cv2.INTER_AREA)
         dstImg = cv2.resize(dstImg, output_image_resizing(dstImg), interpolation = cv2.INTER_AREA)
 
-        srcImg64formatted = npImgArray_to_base64png(srcImg)  # convert extracted snip image to base64 encoded png
-        dstImg64formatted = npImgArray_to_base64png(dstImg)  # convert extracted snip image to base64 encoded png
+        srcImg64formatted = npImgArray_to_base64png(srcImg)  # convert image to base64 encoded png
+        dstImg64formatted = npImgArray_to_base64png(dstImg)  # convert image to base64 encoded png
 
-    return statsBefore, statsAfter, indexBefore2After, beforeMax, afterMax, srcImg64formatted, dstImg64formatted  # , ratios
+        imgOverlays = {'pre_imgOverlay': srcImg64formatted, 'post_imgOverlay': dstImg64formatted}
+
+    return statsBefore, statsAfter, indexBefore2After, beforeMax, afterMax, imgOverlays if 'imgOverlays' in locals() else None  # , ratios  # ratios not needed anymore (are calculated now in results notebook)
+
+    # else:
+    #     return statsBefore, statsAfter, indexBefore2After, beforeMax, afterMax  # , ratios

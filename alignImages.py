@@ -49,11 +49,11 @@ def getLabelsAndContoursFromImage(image: np.ndarray, params: dh.RecognitionParam
     if params is None:
         params = dh.RecognitionParameters()
 
-    labelsImg, *others = dh.identify_particles(image, params)
+    labelsImg, *others, LowerTH = dh.identify_particles(image, params)
     contours, skipIndices = getContours(labelsImg, params.minArea, params.maxArea)
     for i in skipIndices:
         labelsImg[labelsImg == i+1] = 0
-    return labelsImg, contours
+    return labelsImg, contours, LowerTH  # LowerTH: also return the lower threshold determined in the hysteresis
 
 
 def getContourCentersFromImage(image: np.ndarray, params: dh.RecognitionParameters = dh.RecognitionParameters()) -> np.ndarray:

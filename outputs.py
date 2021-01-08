@@ -43,8 +43,8 @@ def generateOutputGraphs(sourceCenters: np.ndarray, dstCenters: np.ndarray,
     dstImg = np.uint8(np.round(0.5 * dstImg + 0.5 * dstImgMarkovers))
 
     # draw all contours with red outline
-    cv2.drawContours(srcImg, sourceContours, -1, (255, 0, 0), 2)
-    cv2.drawContours(dstImg, dstContours, -1, (255, 0, 0), 2)
+    cv2.drawContours(srcImg, sourceContours, -1, (0, 0, 255), 10)
+    cv2.drawContours(dstImg, dstContours, -1, (0, 0, 255), 10)
 
     # now add numbers
     # fontSize = int(round(srcImg.shape[0] / 300))
