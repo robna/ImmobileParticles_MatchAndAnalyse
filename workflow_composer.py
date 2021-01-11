@@ -16,7 +16,7 @@ keys.sort_values(by=['polymer', 'treatment'], inplace=True)  # sort the keys tab
 
 # pre_directory = r'C:\Users\xbrjos\Desktop\New folder\quantDigest_imageData\tif_pre_test'  # Josefs paths
 # post_directory = r'C:\Users\xbrjos\Desktop\New folder\quantDigest_imageData\tif_post'  # Josefs paths
-pre_directory = r'/run/media/nibor/data_ext/quantDigest_imageData/tif_pre_test2/'  # Robins paths
+pre_directory = r'/run/media/nibor/data_ext/quantDigest_imageData/tif_pre/'  # Robins paths
 post_directory = r'/run/media/nibor/data_ext/quantDigest_imageData/tif_post/'  # Robins paths
 
 # %%
@@ -71,10 +71,10 @@ def process_results(results, wafer_results, particle_results, particle_snips):
         wafer_results.at[cwn, 'pre_count'] = len(statsBefore)
         wafer_results.at[cwn, 'post_count'] = len(statsAfter)
         wafer_results.at[cwn, 'matched_count'] = len(indexBefore2After)
-        wafer_results.at[
-            cwn, 'pre_histPeaks'] = beforeMax  # now as tuple: first value is most abundant grey value in foreground (>128), 2nd in background (<128)
-        wafer_results.at[
-            cwn, 'post_histPeaks'] = afterMax  # now as tuple: first value is most abundant grey value in foreground (>128), 2nd in background (<128)
+        wafer_results.at[cwn, 'pre_histBGpeak'] = beforeMax[0]  # now as array: first value is most abundant grey value in foreground (>128), 2nd in background (<128)
+        wafer_results.at[cwn, 'post_histBGpeak'] = afterMax[0]  # now as array: first value is most abundant grey value in foreground (>128), 2nd in background (<128)
+        wafer_results.at[cwn, 'pre_histFGpeak'] = beforeMax[1]  # now as array: first value is most abundant grey value in foreground (>128), 2nd in background (<128)
+        wafer_results.at[cwn, 'post_histFGpeak'] = afterMax[1]  # now as array: first value is most abundant grey value in foreground (>128), 2nd in background (<128)
         wafer_results.at[cwn, 'process_time'] = tn
         if imgOverlays[0][0] is not None:
             pre_imgOverlay = imgOverlays[0][0]['pre_imgOverlay']
@@ -122,8 +122,8 @@ if __name__ == '__main__':
                  Path(  # pathlib.Path.glob creates a generator, which is used to make a list of paths here
                      pre_directory).glob(  # enter path to pre image directory
                      '*.tif')]  # collect all tiff files from path
-    # pre_paths = sorted(pre_paths,
-    #                    key=lambda x: keys.index.get_loc(x.stem.split('_')[0]))  # sort paths like the key table
+    pre_paths = sorted(pre_paths,
+                       key=lambda x: keys.index.get_loc(x.stem.split('_')[0]))  # sort paths like the key table
 
 
     if pm.config['multiprocessing']:

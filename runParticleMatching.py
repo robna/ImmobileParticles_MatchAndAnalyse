@@ -65,8 +65,8 @@ def runPM(pathBeforeImg, pathAfterImg):
     beforeMaxFG = np.argmax(cv2.calcHist([beforeImg_nonBlur], [0], None, [256], [0, 256])[beforeLowerTH:-1]) + 128  # find most abundant foreground grey value
     afterMaxFG = np.argmax(cv2.calcHist([afterImg_nonBlur], [0], None, [256], [0, 256])[afterLowerTH:-1]) + 128
 
-    beforeMax = (beforeMaxBG, beforeMaxFG)
-    afterMax = (afterMaxBG, afterMaxFG)
+    beforeMax = [beforeMaxBG, beforeMaxFG]
+    afterMax = [afterMaxBG, afterMaxFG]
 
     ymin, ymax = beforeCenters[:, 1].min(), beforeCenters[:, 1].max()
     maxDistError = (ymax - ymin) * config["particleDistTolerance"] / 100
@@ -111,6 +111,3 @@ def runPM(pathBeforeImg, pathAfterImg):
         imgOverlays = {'pre_imgOverlay': srcImg64formatted, 'post_imgOverlay': dstImg64formatted}
 
     return statsBefore, statsAfter, indexBefore2After, beforeMax, afterMax, imgOverlays if 'imgOverlays' in locals() else None  # , ratios  # ratios not needed anymore (are calculated now in results notebook)
-
-    # else:
-    #     return statsBefore, statsAfter, indexBefore2After, beforeMax, afterMax  # , ratios
