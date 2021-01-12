@@ -86,12 +86,12 @@ def offSetPoints(points: np.ndarray, angle: float, shift: np.ndarray) -> np.ndar
 
 
 def getIndicesAndErrosFromCenters(beforePoints: np.ndarray, afterPoints: np.ndarray,
-                                  maxDistError: float = np.inf) -> Tuple[np.ndarray, Dict[int, int]]:
+                                  maxDistErrorPerParticle: List[float] = []) -> Tuple[np.ndarray, Dict[int, int]]:
     """
     Calculates the distance of all centers and report the assignment of points in lessPoints to points in morePoints
     :param beforePoints: (N x 2) shape array of x, y coordinates
     :param afterPoints: (M x 2) shape array of x, y coordinates, ideally M >= N
-    :param maxDistError: maximum tolerated distance between points to be accepted as pairings
+    :param maxDistErrorPerParticle: maximum tolerated distance between points to be accepted as pairings, given per particle
     :return: tuple: error (float), list of indices mapping particleIndices from before image to after image
     """
     inverted: bool = False
@@ -99,6 +99,9 @@ def getIndicesAndErrosFromCenters(beforePoints: np.ndarray, afterPoints: np.ndar
     if morePoints.shape[0] < lessPoints.shape[0]:
         inverted = True
         morePoints, lessPoints = lessPoints, morePoints
+
+    if len(maxDistErrorPerParticle) == 0:
+        maxDistErrorPerParticle = [np.inf]*beforePoints.shape[0]
 
     errors: List[float] = []
     indicesBefore2After: Dict[int, int] = {}
@@ -109,6 +112,8 @@ def getIndicesAndErrosFromCenters(beforePoints: np.ndarray, afterPoints: np.ndar
         minDist = distMat[i, j]
         distMat[i, :] = np.inf  # effectively removes these indices from further consideration
         distMat[:, j] = np.inf  # effectively removes these indices from further consideration
+
+        maxDistError = maxDistErrorPerParticle[i] if inverted else maxDistErrorPerParticle[j]
 
         if minDist <= maxDistError:
             if inverted:
@@ -123,7 +128,7 @@ def getIndicesAndErrosFromCenters(beforePoints: np.ndarray, afterPoints: np.ndar
 
 
 def getDiffOfAngleShift(angleShift: np.ndarray, origPoints: np.ndarray, knownDstPoints: np.ndarray,
-                        maxDistError: float = np.inf) -> np.ndarray:
+                        maxDistErrorPerParticle: List[float] = []) -> np.ndarray:
     """
     Applies angle and shift to the origPoints and calulates differences to the knownDstPoints.
     First, the transform is applied to origPoints. Then, the transformed Points are mapped to the known Dst points
@@ -131,27 +136,31 @@ def getDiffOfAngleShift(angleShift: np.ndarray, origPoints: np.ndarray, knownDst
     :param angleShift: shape(3) array, [0] = angle (degree), [1, 2] = x, y offset
     :param origPoints: Nx2 array of N source points
     :param knownDstPoints: Mx2 array of M target points, M can or cannot be equal N
-    :param maxDistError: maximum tolerated distance between points to be accepted as pairings
+    :param maxDistErrorPerParticle: maximum tolerated distance between points to be accepted as pairings, given per particle.
     :return: ravelled differences of all coordinates, suitable for least_square optimization
     """
     origPoints = origPoints.astype(np.float)  # just to make sure not to have any integer datatypes...
     knownDstPoints = knownDstPoints.astype(np.float)
     transformedPoints = offSetPoints(origPoints, angleShift[0], np.array([angleShift[1], angleShift[2]]))
-
-    err, ind = getIndicesAndErrosFromCenters(transformedPoints, knownDstPoints, maxDistError)
+    if len(maxDistErrorPerParticle) == 0:
+        maxDistErrorPerParticle = [np.inf] * origPoints.shape[0]
+    err, ind = getIndicesAndErrosFromCenters(transformedPoints, knownDstPoints, maxDistErrorPerParticle)
     assert len(ind) > 0
     return err
 
 
 def findAngleAndShift(points1: np.ndarray, points2: np.ndarray,
-                      maxDistError: float = np.inf) -> Tuple[float, np.ndarray]:
+                      points1Radii: List[float] = []) -> Tuple[float, np.ndarray]:
     """
     Finds the best fitting angle and shift for the given pair of points. They don't have to be ordered.
     :return tuple(optAngle: float, optShift: (1x2)np.ndarray)
     """
     points1 = points1.astype(np.float)
     points2 = points2.astype(np.float)
-    errFunc = lambda x: getDiffOfAngleShift(x, points1, points2, maxDistError)
+    if len(points1Radii) == 0:
+        points1Radii = [np.inf] * points1.shape[0]
+
+    errFunc = lambda x: getDiffOfAngleShift(x, points1, points2, points1Radii)
     xstart = np.array([0, 0, 0])
     opt = sciOpt.least_squares(errFunc, xstart, bounds=(np.array([-45, -np.inf, -np.inf]), np.array([45, np.inf, np.inf])),
                                method='dogbox')
