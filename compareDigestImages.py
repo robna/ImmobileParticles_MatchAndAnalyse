@@ -14,17 +14,17 @@ from outputs import prepareDefaultWaferDataFrame
 
 t_start = time.time()
 
-px_res_orig = 0.35934295644272635  # µm / px in original resolution of microscope  # TODO: Do we need thaaaaaat many digits???
+px_res_orig = 0.359  # µm / px in original resolution of microscope (value from image meta data: 0.35934295644272635)
 px_res = px_res_orig * 2  # 2nd level of pyramid of source image was used, so double resolution.
 
 keys: pd.DataFrame = pd.read_csv('wafer-polymer-keyfile.csv', index_col='wafer')
 keys.dropna(inplace=True)
 keys.sort_values(by=['polymer', 'treatment'], inplace=True)  # sort the keys table after polymer and treatment
 
-pre_directory = r'C:\Users\xbrjos\Desktop\New folder\quantDigest_imageData\tif_pre_test'  # Josefs paths
-post_directory = r'C:\Users\xbrjos\Desktop\New folder\quantDigest_imageData\tif_post'  # Josefs paths
-# pre_directory = r'/run/media/nibor/data_ext/quantDigest_imageData/tif_pre/'  # Robins paths
-# post_directory = r'/run/media/nibor/data_ext/quantDigest_imageData/tif_post/'  # Robins
+# pre_directory = r'C:\Users\xbrjos\Desktop\New folder\quantDigest_imageData\tif_pre_test'  # Josefs paths
+# post_directory = r'C:\Users\xbrjos\Desktop\New folder\quantDigest_imageData\tif_post'  # Josefs paths
+pre_directory = r'/run/media/nibor/data_ext/quantDigest_imageData/tif_pre/'  # Robins paths
+post_directory = r'/run/media/nibor/data_ext/quantDigest_imageData/tif_post/'  # Robins paths
 
 
 class Config:

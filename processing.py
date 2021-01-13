@@ -67,10 +67,10 @@ def process_results(results, wafer_results, particle_results, particle_snips):
         wafer_results.at[cwn, 'pre_count'] = len(statsBefore)
         wafer_results.at[cwn, 'post_count'] = len(statsAfter)
         wafer_results.at[cwn, 'matched_count'] = len(indexBefore2After)
-        wafer_results.at[cwn, 'pre_histBGpeak'] = beforeMax[0]  # now as array: first value is most abundant grey value in foreground (>128), 2nd in background (<128)
-        wafer_results.at[cwn, 'post_histBGpeak'] = afterMax[0]  # now as array: first value is most abundant grey value in foreground (>128), 2nd in background (<128)
-        wafer_results.at[cwn, 'pre_histFGpeak'] = beforeMax[1]  # now as array: first value is most abundant grey value in foreground (>128), 2nd in background (<128)
-        wafer_results.at[cwn, 'post_histFGpeak'] = afterMax[1]  # now as array: first value is most abundant grey value in foreground (>128), 2nd in background (<128)
+        wafer_results.at[cwn, 'pre_histBGpeak'] = beforeMax[0]
+        wafer_results.at[cwn, 'post_histBGpeak'] = afterMax[0]
+        wafer_results.at[cwn, 'pre_histFGpeak'] = beforeMax[1]
+        wafer_results.at[cwn, 'post_histFGpeak'] = afterMax[1]
         wafer_results.at[cwn, 'process_time'] = tn
         if imgOverlays[0][0] is not None:
             pre_imgOverlay = imgOverlays[0][0]['pre_imgOverlay']
@@ -90,6 +90,6 @@ def process_results(results, wafer_results, particle_results, particle_snips):
 
         particle_results = particle_results.append(stats_combined)
 
-        print(f'Images of {cwn} with {cwp} and {cwt} were completed after {tn} min. Total time so far: {round((time.time() - t_start) / 3600, ndigits=1)}')
+        print(f'Images of {cwn} with {cwp} and {cwt} were completed after {tn} min. Total time so far: {round((time.time() - t_start) / 3600, ndigits=1)} h')
 
     return wafer_results, particle_results, particle_snips

@@ -37,7 +37,7 @@ def generateOutputGraphs(sourceCenters: np.ndarray, dstCenters: np.ndarray,
 
     # now fill matched particles with color
     numParticlesMatched = len(indicesBeforeAfter)
-    colorStep = 1 / numParticlesMatched
+    colorStep = 1 / (numParticlesMatched + 1)  # TODO: Robin added 1 to avoid division by zero error when no particles were found. Is that a problem?
     hue = 0
     for origInd, targetInd in indicesBeforeAfter.items():
         color = colorsys.hsv_to_rgb(hue, 1, 1)

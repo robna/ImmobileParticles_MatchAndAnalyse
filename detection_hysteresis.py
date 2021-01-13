@@ -77,7 +77,7 @@ def getContourRadii(contours: List[np.ndarray]) -> List[float]:
     radii: List[float] = []
     for cnt in contours:
         area = cv2.contourArea(cnt)
-        radii.append(np.sqrt(area / np.pi))
+        radii.append(8 * np.sqrt(area / np.pi))  # TODO: Robin needed to increase the radius, otherwise to few particles get matched. Don't know yet what will be the optimal value
     return radii
 
 
@@ -85,14 +85,14 @@ def measure_particles(grayImg: np.ndarray, contours: List[np.ndarray], um_per_px
     """Calculate Area, Perimeter and avg. Intensity in correct order."""
     areas, perimeters, intensities, snips, snipWs, snipHs = [], [], [], [], [], []
     for cnt in contours:
-        areas.append(cv2.contourArea(cnt))
-        perimeters.append(cv2.arcLength(cnt, closed=True))
+        areas.append(cv2.contourArea(cnt))  # TODO: is it possible to just multiply this by um_per_px**2 to get the results in µm²?
+        perimeters.append(cv2.arcLength(cnt, closed=True))  # TODO: equivalent question to line above but just um_per_px...
         mask = np.zeros(grayImg.shape, np.uint8)
         cv2.drawContours(mask, [cnt], 0, 255, -1)
         intensities.append(cv2.mean(grayImg, mask=mask)[0])  # we only have grayscale, so only take first index [0]
 
         snipImage = getSnipImage(cnt, grayImg, um_per_px)
-        snipHs.append(snipImage.shape[0])
+        snipHs.append(snipImage.shape[0])  # TODO: I don't think snip width and height are used for any thing... needs to be checked. could be dropped if so.
         snipWs.append(snipImage.shape[1])
         snip64formatted = npImgArray_to_base64png(snipImage)  # convert extracted snip image to base64 encoded png
         snips.append(snip64formatted)  # save extracted particle image as base64 encoded png

@@ -71,7 +71,7 @@ def runParticleMatching(pathBeforeImg, pathAfterImg):
     statsBefore: 'pd.DataFrame' = measure_particles(beforeImg_nonBlur, beforeContours, um_per_px=px_res)
     statsAfter: 'pd.DataFrame' = measure_particles(afterImg_nonBlur, afterContours, um_per_px=px_res)
 
-    if Config.showPartImages and beforeImg.size < 200_000_000 and afterImg.size < 200_000_000:  # check that image size does not exceed 100 MB
+    if Config.showPartImages and beforeImg.size < 100_000_000 and afterImg.size < 100_000_000:  # check that image size does not exceed 100 MB
         srcImg, dstImg = generateOutputGraphs(beforeCenters, afterCenters, beforeContours, afterContours, beforeImg,
                                               afterImg, 'before', 'after', indexBefore2After)
 
@@ -95,7 +95,7 @@ def runParticleMatching(pathBeforeImg, pathAfterImg):
 
 def getBeforeAfterMax(imgBefore: np.ndarray, imgAfter: np.ndarray, threshBefore: int, threshAfter: int) -> Tuple:
     """
-    Get the most abundant background and foreground gray values in the images. It's recommented to use non-blurred images.
+    Get the most abundant background and foreground gray values in the images. It's recommended to use non-blurred images.
     :param imgBefore:
     :param imgAfter:
     :param threshBefore:
@@ -105,8 +105,8 @@ def getBeforeAfterMax(imgBefore: np.ndarray, imgAfter: np.ndarray, threshBefore:
     beforeMaxBG = np.argmax(cv2.calcHist([imgBefore], [0], None, [256], [0, 256])[1:threshBefore]) + 1
     afterMaxBG = np.argmax(cv2.calcHist([imgAfter], [0], None, [256], [0, 256])[1:threshAfter]) + 1
 
-    beforeMaxFG = np.argmax(cv2.calcHist([imgBefore], [0], None, [256], [0, 256])[threshBefore:-1]) + 128
-    afterMaxFG = np.argmax(cv2.calcHist([imgAfter], [0], None, [256], [0, 256])[threshAfter:-1]) + 128
+    beforeMaxFG = np.argmax(cv2.calcHist([imgBefore], [0], None, [256], [0, 256])[threshBefore:-1]) + threshBefore
+    afterMaxFG = np.argmax(cv2.calcHist([imgAfter], [0], None, [256], [0, 256])[threshAfter:-1]) + threshAfter
 
     beforeMax = [beforeMaxBG, beforeMaxFG]
     afterMax = [afterMaxBG, afterMaxFG]
