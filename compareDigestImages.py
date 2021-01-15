@@ -21,10 +21,10 @@ keys: pd.DataFrame = pd.read_csv('wafer-polymer-keyfile.csv', index_col='wafer')
 keys.dropna(inplace=True)
 keys.sort_values(by=['polymer', 'treatment'], inplace=True)  # sort the keys table after polymer and treatment
 
-# pre_directory = r'C:\Users\xbrjos\Desktop\New folder\quantDigest_imageData\tif_pre_test'  # Josefs paths
-# post_directory = r'C:\Users\xbrjos\Desktop\New folder\quantDigest_imageData\tif_post'  # Josefs paths
-pre_directory = r'/run/media/nibor/data_ext/quantDigest_imageData/tif_pre/'  # Robins paths
-post_directory = r'/run/media/nibor/data_ext/quantDigest_imageData/tif_post/'  # Robins paths
+pre_directory = r'C:\Users\xbrjos\Desktop\New folder\quantDigest_imageData\tif_pre_test'  # Josefs paths
+post_directory = r'C:\Users\xbrjos\Desktop\New folder\quantDigest_imageData\tif_post'  # Josefs paths
+# pre_directory = r'/run/media/nibor/data_ext/quantDigest_imageData/tif_pre/'  # Robins paths
+# post_directory = r'/run/media/nibor/data_ext/quantDigest_imageData/tif_post/'  # Robins paths
 
 
 class Config:

@@ -37,22 +37,23 @@ def generateOutputGraphs(sourceCenters: np.ndarray, dstCenters: np.ndarray,
 
     # now fill matched particles with color
     numParticlesMatched = len(indicesBeforeAfter)
-    colorStep = 1 / (numParticlesMatched + 1)  # TODO: Robin added 1 to avoid division by zero error when no particles were found. Is that a problem?
-    hue = 0
-    for origInd, targetInd in indicesBeforeAfter.items():
-        color = colorsys.hsv_to_rgb(hue, 1, 1)
-        color = color[0] * 255, color[1] * 255, color[2] * 255
+    if numParticlesMatched > 0:
+        colorStep = 1 / numParticlesMatched
+        hue = 0
+        for origInd, targetInd in indicesBeforeAfter.items():
+            color = colorsys.hsv_to_rgb(hue, 1, 1)
+            color = color[0] * 255, color[1] * 255, color[2] * 255
 
-        cnt = sourceContours[origInd]
-        cv2.drawContours(srcimgMarkovers, [cnt], -1, color, -1)
+            cnt = sourceContours[origInd]
+            cv2.drawContours(srcimgMarkovers, [cnt], -1, color, -1)
 
-        cnt = dstContours[targetInd]
-        cv2.drawContours(dstImgMarkovers, [cnt], -1, color, -1)
+            cnt = dstContours[targetInd]
+            cv2.drawContours(dstImgMarkovers, [cnt], -1, color, -1)
 
-        hue += colorStep
+            hue += colorStep
 
-    srcImg = np.uint8(np.round(0.5 * srcImg + 0.5 * srcimgMarkovers))
-    dstImg = np.uint8(np.round(0.5 * dstImg + 0.5 * dstImgMarkovers))
+        srcImg = np.uint8(np.round(0.5 * srcImg + 0.5 * srcimgMarkovers))
+        dstImg = np.uint8(np.round(0.5 * dstImg + 0.5 * dstImgMarkovers))
 
     # draw all contours with red outline, only for not matched particles
     for i, cnt in enumerate(sourceContours):
@@ -85,7 +86,7 @@ def generateOutputGraphs(sourceCenters: np.ndarray, dstCenters: np.ndarray,
     # ax2.imshow(dstImg, cmap='gray')
     # fig2.tight_layout()
     # fig2.show()
-    # breakpoint()
+    # plt.show(block=True)
     return srcImg, dstImg
 
 

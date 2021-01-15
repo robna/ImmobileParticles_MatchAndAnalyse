@@ -77,7 +77,7 @@ def getContourRadii(contours: List[np.ndarray]) -> List[float]:
     radii: List[float] = []
     for cnt in contours:
         area = cv2.contourArea(cnt)
-        radii.append(8 * np.sqrt(area / np.pi))  # TODO: Robin needed to increase the radius, otherwise to few particles get matched. Don't know yet what will be the optimal value
+        radii.append(np.sqrt(area / np.pi))
     return radii
 
 

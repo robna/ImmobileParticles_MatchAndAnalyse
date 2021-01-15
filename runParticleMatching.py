@@ -45,7 +45,7 @@ def runParticleMatching(pathBeforeImg, pathAfterImg):
     params.lowerThreshold = getLowerThresholdForImg(beforeImg)  # * 2
     params.minArea = Config.minParticleArea
     params.maxArea = Config.maxParticleArea
-    params.doHysteresis = False  # Don't do hysteresis first, just to get all particles (better for getting transform)
+    params.doHysteresis = True  # was False before
 
     _, beforeContours, beforeLowerTH = getLabelsAndContoursFromImage(beforeImg, params)
     beforeCenters: np.ndarray = getContourCenters(beforeContours)
@@ -56,14 +56,15 @@ def runParticleMatching(pathBeforeImg, pathAfterImg):
     beforeMax, afterMax = getBeforeAfterMax(beforeImg_nonBlur, afterImg_nonBlur, beforeLowerTH, afterLowerTH)
 
     beforeRadii: List[float] = getContourRadii(beforeContours)
+    errorsPerParticle: List[float] = [rad*8 for rad in beforeRadii]
     angle, shift = findAngleAndShift(beforeCenters, afterCenters, beforeRadii)
 
-    # Now get only the relevant particles
-    params.doHysteresis = True
-    beforeLabels, beforeContours, *_ = getLabelsAndContoursFromImage(beforeImg, params)
-    beforeCenters = getContourCenters(beforeContours)
-    afterLabels, afterContours, *_ = getLabelsAndContoursFromImage(afterImg, params)
-    afterCenters = getContourCenters(afterContours)
+    # # Now get only the relevant particles
+    # params.doHysteresis = True
+    # beforeLabels, beforeContours, *_ = getLabelsAndContoursFromImage(beforeImg, params)
+    # beforeCenters = getContourCenters(beforeContours)
+    # afterLabels, afterContours, *_ = getLabelsAndContoursFromImage(afterImg, params)
+    # afterCenters = getContourCenters(afterContours)
 
     transformedBefore: np.ndarray = offSetPoints(beforeCenters, angle, shift)
     _, indexBefore2After = getIndicesAndErrosFromCenters(transformedBefore, afterCenters, beforeRadii)
