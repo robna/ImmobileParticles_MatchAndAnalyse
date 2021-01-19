@@ -21,10 +21,10 @@ keys: pd.DataFrame = pd.read_csv('wafer-polymer-keyfile.csv', index_col='wafer')
 keys.dropna(inplace=True)
 keys.sort_values(by=['polymer', 'treatment'], inplace=True)  # sort the keys table after polymer and treatment
 
-pre_directory = r'C:\Users\xbrjos\Desktop\New folder\quantDigest_imageData\tif_pre_test'  # Josefs paths
-post_directory = r'C:\Users\xbrjos\Desktop\New folder\quantDigest_imageData\tif_post'  # Josefs paths
-# pre_directory = r'/run/media/nibor/data_ext/quantDigest_imageData/tif_pre/'  # Robins paths
-# post_directory = r'/run/media/nibor/data_ext/quantDigest_imageData/tif_post/'  # Robins paths
+# pre_directory = r'C:\Users\xbrjos\Desktop\New folder\quantDigest_imageData\tif_pre_test'  # Josefs paths
+# post_directory = r'C:\Users\xbrjos\Desktop\New folder\quantDigest_imageData\tif_post'  # Josefs paths
+pre_directory = r'/run/media/nibor/data_ext/quantDigest_imageData/tif_pre_test/'  # Robins paths
+post_directory = r'/run/media/nibor/data_ext/quantDigest_imageData/tif_post/'  # Robins paths
 
 
 class Config:
@@ -36,7 +36,7 @@ class Config:
     maxParticleArea: int = getPxAreaOfEquivalentSphere(200, px_res, imgScaleFactor)
     hystHighThresh: float = 0.75  # relative to maximum image intensity (0...1.0)
     showPartImages: bool = True  # whether or not to show the found and paired particles in before and after image
-    multiprocessing: bool = True
+    multiprocessing: bool = False
 
 
 if __name__ == '__main__':

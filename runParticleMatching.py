@@ -56,8 +56,8 @@ def runParticleMatching(pathBeforeImg, pathAfterImg):
     beforeMax, afterMax = getBeforeAfterMax(beforeImg_nonBlur, afterImg_nonBlur, beforeLowerTH, afterLowerTH)
 
     beforeRadii: List[float] = getContourRadii(beforeContours)
-    errorsPerParticle: List[float] = [rad*8 for rad in beforeRadii]
-    angle, shift = findAngleAndShift(beforeCenters, afterCenters, beforeRadii)
+    errorsPerParticle: List[float] = [rad*4 for rad in beforeRadii]
+    angle, shift = findAngleAndShift(beforeCenters, afterCenters, errorsPerParticle)
 
     # # Now get only the relevant particles
     # params.doHysteresis = True
@@ -67,17 +67,17 @@ def runParticleMatching(pathBeforeImg, pathAfterImg):
     # afterCenters = getContourCenters(afterContours)
 
     transformedBefore: np.ndarray = offSetPoints(beforeCenters, angle, shift)
-    _, indexBefore2After = getIndicesAndErrosFromCenters(transformedBefore, afterCenters, beforeRadii)
+    _, indexBefore2After = getIndicesAndErrosFromCenters(transformedBefore, afterCenters, errorsPerParticle)
 
     statsBefore: 'pd.DataFrame' = measure_particles(beforeImg_nonBlur, beforeContours, um_per_px=px_res)
     statsAfter: 'pd.DataFrame' = measure_particles(afterImg_nonBlur, afterContours, um_per_px=px_res)
 
-    if Config.showPartImages and beforeImg.size < 100_000_000 and afterImg.size < 100_000_000:  # check that image size does not exceed 100 MB
+    if Config.showPartImages and beforeImg.size < 200_000_000 and afterImg.size < 200_000_000:  # check that image size does not exceed 100 MB
         srcImg, dstImg = generateOutputGraphs(beforeCenters, afterCenters, beforeContours, afterContours, beforeImg,
                                               afterImg, 'before', 'after', indexBefore2After)
 
         def output_image_resizing(img):
-            width = 800  # output image width should be 800 px
+            width = 400  # output image width should be multiple of 400 px
             scaling = width / img.shape[1]
             height = round(img.shape[0] * scaling)  # scale height proportionally
             dim = (width, height)

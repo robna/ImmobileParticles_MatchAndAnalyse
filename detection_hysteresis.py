@@ -85,8 +85,8 @@ def measure_particles(grayImg: np.ndarray, contours: List[np.ndarray], um_per_px
     """Calculate Area, Perimeter and avg. Intensity in correct order."""
     areas, perimeters, intensities, snips, snipWs, snipHs = [], [], [], [], [], []
     for cnt in contours:
-        areas.append(cv2.contourArea(cnt))  # TODO: is it possible to just multiply this by um_per_px**2 to get the results in µm²?
-        perimeters.append(cv2.arcLength(cnt, closed=True))  # TODO: equivalent question to line above but just um_per_px...
+        areas.append(cv2.contourArea(cnt) * (um_per_px ** 2))  # TODO: is it possible to just multiply this by um_per_px**2 to get the results in µm²?
+        perimeters.append(cv2.arcLength(cnt, closed=True) * um_per_px)  # TODO: equivalent question to line above but just um_per_px...
         mask = np.zeros(grayImg.shape, np.uint8)
         cv2.drawContours(mask, [cnt], 0, 255, -1)
         intensities.append(cv2.mean(grayImg, mask=mask)[0])  # we only have grayscale, so only take first index [0]
