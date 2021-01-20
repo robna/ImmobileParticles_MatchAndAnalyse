@@ -18,8 +18,8 @@ def get_areas_from_particles(wafer_results, molten_particles):
         post_area_matched_mean = waf.postValue.mean()
         wafer_results.loc[(wafer_results.wafer == w), 'post_area_matched'] = round(post_area_matched_mean)
 
-    wafer_results[pl] = round((abs(wafer_results.matched_count / wafer_results.pre_count - 1)), 2)  # Get normalised particle losses for each wafer: counts of particles in pre state divided by counts in post state. Subtract 1 to normalise. Take absolute value to treat particle loss and particle addition as the same.
-    wafer_results[ac] = round((wafer_results.post_area_matched / wafer_results.pre_area_matched - 1), 2)  # same for area...
+    wafer_results[pl] = abs(wafer_results.matched_count / wafer_results.pre_count - 1)  # Get normalised particle losses for each wafer: counts of particles in pre state divided by counts in post state. Subtract 1 to normalise. Take absolute value to treat particle loss and particle addition as the same.
+    wafer_results[ac] = wafer_results.post_area_matched / wafer_results.pre_area_matched - 1  # same for area...
     return wafer_results
 
 
@@ -32,8 +32,6 @@ def subtract_water(wafer_results):
         pol[ac + wC] = pol.loc[pol.treatment != w, ac] - pol.loc[pol.treatment == w, ac].iloc[0]  # same for area
         pol[pl + gC + wC] = pol.loc[pol.treatment != w, pl + gC] - pol.loc[pol.treatment == w, pl + gC].iloc[0]  # subtract particle loss of water from particle losses of all other treatments to get the percentage point error (meaning loss OR addition) of particle numbers caused by each treatment
         pol[ac + gC + wC] = pol.loc[pol.treatment != w, ac + gC] - pol.loc[pol.treatment == w, ac + gC].iloc[0]  # same for area
-
-        # pol.drop(pol[pol.treatment == w].index, inplace=True)  # the rows with the water treatments can now be deleted
 
         pol.loc[(pol[pl + wC] < 0), pl + wC] = 0  # set all ratios that were smaller than water ratio (and thus got now negative due to water ratio correction) to 0.
         # pol.loc[(pol[ac + wC] > 0), ac + wC] = 0  # same for area
@@ -114,16 +112,21 @@ def wafer_wrangling(wafer_results, molten_particles):
         wafer_results['histBGpeakDist'] = abs(wafer_results.pre_histBGpeak - wafer_results.post_histBGpeak)
 
     wafer_results, paramsDF = glm.count_loss_glm(wafer_results)  # this fits a glm to particle_loss (binomial data) with pre_count (n) and BDI as predictors. Standard residuals are taken as new (actual treatment-dependent) loss values.
-    wafer_results = glm.area_change_glm(wafer_results, molten_particles)
+    wafer_results, paramsDF = glm.area_change_glm(wafer_results, molten_particles)
 
     if Config.manualBDI:
         import BDI
         alpha, beta = BDI.optimise(wafer_results)  # runs a linear regression between differently calculated BDIs and particle_loss, it give back the alpha and beta paramters for the BDI calculation, that produced the highest correlation r value.
         wafer_results = BDI.make_BDI(wafer_results, alpha, beta)  # takes the optimised alpha, beta values and calculates the BDI for all wafers
 
-    wafer_results_wrangled = subtract_water(wafer_results)
+    wafer_results = subtract_water(wafer_results)  # offset loss and change values by the respective negative control (water treatment)
+
+
+
+
+
     if Config.semiMelted:
-        wafer_results_wrangled = semiMelting(wafer_results_wrangled)
+        wafer_results_wrangled = semiMelting(wafer_results)
     else:
-        wafer_results_wrangled = doubleMelting(wafer_results_wrangled)
+        wafer_results_wrangled = doubleMelting(wafer_results)
     return wafer_results_wrangled, wafer_images, paramsDF

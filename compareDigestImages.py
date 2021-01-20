@@ -23,7 +23,7 @@ keys.sort_values(by=['polymer', 'treatment'], inplace=True)  # sort the keys tab
 
 # pre_directory = r'C:\Users\xbrjos\Desktop\New folder\quantDigest_imageData\tif_pre_test'  # Josefs paths
 # post_directory = r'C:\Users\xbrjos\Desktop\New folder\quantDigest_imageData\tif_post'  # Josefs paths
-pre_directory = r'/run/media/nibor/data_ext/quantDigest_imageData/tif_pre_test/'  # Robins paths
+pre_directory = r'/run/media/nibor/data_ext/quantDigest_imageData/tif_pre/'  # Robins paths
 post_directory = r'/run/media/nibor/data_ext/quantDigest_imageData/tif_post/'  # Robins paths
 
 

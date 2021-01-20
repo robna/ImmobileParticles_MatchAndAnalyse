@@ -33,5 +33,5 @@ class Config:
     wafers2drop: list = []  # any wafers to be excluded from analysis TODO: not yet implemented in wafer_wrangling
     polymers2drop: list = []  # any polymers to be excluded from analysis
     treatments2drop: list = []  # any treatments to be excluded from analysis
-    glmPlots: bool = True  # show GLM results as matplotlib figures
+    glmPlots: bool = False  # show GLM results as matplotlib figures
     useGLMpredIv: bool = True  # correct values with GLM fit based on upper limit of prediction interval (True) or fitted linearized regression (False)
