@@ -1,3 +1,5 @@
+import pandas as pd
+
 BDIdict = {
     0: 'pre_histBGpeak',
     1: 'pre_histFGpeak',
@@ -16,22 +18,41 @@ Ndict = {
     2: 'post_count'
 }
 
+drops = {
+    'wafers': ['', ''],  # a list of wafer names to be dropped from analysis
+    'combis': [['',''], ['','']],  # alternatively to wafers lists with treatment and polymer can be used to drop these combinations (each list may include arbitrary numbers of polymers and treatments in arbitrary order)
+    'polymers': ['PS', 'PMMA', 'PVC', 'ABS'],  # a list of polymers to be dropped from analysis (all treatments)
+    'treatments': ['','']  # a list of treatments to be dropped from analysis (all polymers)
+}
+
+
 class Config:
     """
     Use this struct to specify parameters for data analysis
     """
     semiMelted: bool = False  # semiMelted wafer df was used before glm corrections were included, now use doubleMelt
+
     minParameterForBDI: float = -10  # smallest number for alpha and beta in BDI optimisation (only used for manual BDI)
     maxParameterForBDI: float = 11  # largest number for alpha and beta in BDI optimisation (only used for manual BDI)
     stepParameterForBDI: float = 1.0  # step size for alpha and beta in BDI optimisation (only used for manual BDI)
-    manualBDI: bool = False  # True means running BDI module for creating BDI, False takes values from relevant GLM
-    glmPredictorTesting: bool = True  # whether to test different input parameters for what make the best GLM model
-    glmImgQualiPredictors: list = [BDIdict[4], BDIdict[5]]  # 2 columns from wafer_results DF to be used as predictors, can be any of BDIdict
+    manualBDI: bool = True  # True means running BDI module for creating BDI, False takes values from relevant GLM
+
     glmNpredictor: str = Ndict[1]  # what to use in GLM as a n-related predictor: one value of Ndict
-    countGLMformula: str = None  # glm can be run by passing a custom formula, default (None) results in array based GLM
-    areaGLMformula: str = None
-    wafers2drop: list = []  # any wafers to be excluded from analysis TODO: not yet implemented in wafer_wrangling
-    polymers2drop: list = []  # any polymers to be excluded from analysis
-    treatments2drop: list = []  # any treatments to be excluded from analysis
-    glmPlots: bool = False  # show GLM results as matplotlib figures
-    useGLMpredIv: bool = True  # correct values with GLM fit based on upper limit of prediction interval (True) or fitted linearized regression (False)
+    glmImgQualiPredictors: list = [BDIdict[2], BDIdict[4]]  # 2 columns from wafer_results DF to be used as predictors, can be any of BDIdict
+
+    formulaBasedGLM: bool = True
+    # countGLMformula: str = f'failure + success ~ {glmNpredictor} + ' \  # doesnt work with Predictor testing loops... formulas are defined in glm for now
+    #                        f'{glmImgQualiPredictors[0]} + ' \
+    #                        f'{glmImgQualiPredictors[1]}'
+    # areaGLMformula: str = f'area_change ~ {glmNpredictor} + ' \
+    #                       f'{glmImgQualiPredictors[0]} + ' \
+    #                       f'{glmImgQualiPredictors[1]} '
+
+    glmPredictorTesting: bool = False  # whether to test different input parameters for what make the best GLM model
+    glmPlots: bool = True  # show GLM results as matplotlib figures
+    useGLMpredIv: bool = False  # correct values with GLM fit based on upper limit of prediction interval (True) or fitted linearized regression (False)
+    areaPerParticleGLM: bool = False
+
+
+class reports:
+    GLMparams = pd.DataFrame(index=[0])

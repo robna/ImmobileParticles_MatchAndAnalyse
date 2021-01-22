@@ -1,6 +1,7 @@
 import pandas as pd
+import numpy as np
 import glm
-from settings import Config
+import settings
 
 # some abbreviations
 pl = 'particle_loss'
@@ -87,15 +88,38 @@ def doubleMelting(wafer_results_wrangled):
     return doubleMelt
 
 
-def wafer_wrangling(wafer_results, molten_particles):
-    wafer_results.dropna(subset=['pre_count'], inplace=True)  # drop any lines were there were no results (i.e. no particles found in pre image)
+def dropping(wafer_results):
+    # drop any lines were there were no results (i.e. no particles found in pre image)
+    wafer_results.dropna(subset=['pre_count'], inplace=True)
 
-    # TODO: change dropping procedures to get info what to drop from Config from analyse_data.py
-    # wafer_results.drop(
-    #     wafer_results.loc[(wafer_results.treatment == 'KOH') & (wafer_results.polymer.isin(['PET', 'PP']))].index,
-    #     inplace=True)  # exclude failed KOH wafers
-    # wafer_results.drop(wafer_results.loc[wafer_results.polymer.isin(['PVC','PMMA','PS', 'ABS'])].index, inplace=True)  # exclude whole polymers that do not work well with DIC imaging
-    # wafer_results.drop(wafer_results[wafer_results.treatment == 'HCl'].index, inplace=True)  # drop calibration HCl treatment (if not wanted in results)
+    for d in settings.drops['wafers']:
+        wafer_results.drop(wafer_results.loc[(wafer_results.wafer == d)].index, inplace=True)
+    for d in settings.drops['combis']:
+        wafer_results.drop(wafer_results.loc[(wafer_results.treatment.isin(d)) &\
+                                             (wafer_results.polymer.isin(d))].index, inplace=True)
+    for d in settings.drops['polymers']:
+        wafer_results.drop(wafer_results.loc[(wafer_results.polymer == d)].index, inplace=True)
+    for d in settings.drops['treatments']:
+        wafer_results.drop(wafer_results.loc[(wafer_results.treatment == d)].index, inplace=True)
+        return wafer_results
+
+
+def predictor_testing(wafer_results, molten_particles):
+    # settings.Config.glmPredictorTesting = False
+    for f0 in np.arange(0, len(settings.Ndict)):
+        settings.Config.glmNpredictor = settings.Ndict[f0]
+        for f1 in np.arange(0, len(settings.BDIdict)):
+            settings.Config.glmImgQualiPredictors[0] = settings.BDIdict[f1]
+            for f2 in np.arange(0, len(settings.BDIdict)):
+                settings.Config.glmImgQualiPredictors[1] = settings.BDIdict[f2]
+
+                wafer_results = glm.count_loss_glm(wafer_results)  # this fits a glm to particle_loss (binomial data) with pre_count (n) and BDI as predictors. Standard residuals are taken as new (actual treatment-dependent) loss values.
+                wafer_results = glm.area_change_glm(wafer_results, molten_particles)
+    return wafer_results
+
+
+def wafer_wrangling(wafer_results, molten_particles):
+    wafer_results = dropping(wafer_results)
 
     wafer_images = pd.DataFrame()
     wafer_images[['wafer', 'polymer', 'treatment']] = wafer_results[['wafer', 'polymer', 'treatment']]
@@ -111,22 +135,21 @@ def wafer_wrangling(wafer_results, molten_particles):
         wafer_results['histBGpeakSum'] = wafer_results.pre_histBGpeak + wafer_results.post_histBGpeak
         wafer_results['histBGpeakDist'] = abs(wafer_results.pre_histBGpeak - wafer_results.post_histBGpeak)
 
-    wafer_results, paramsDF = glm.count_loss_glm(wafer_results)  # this fits a glm to particle_loss (binomial data) with pre_count (n) and BDI as predictors. Standard residuals are taken as new (actual treatment-dependent) loss values.
-    wafer_results, paramsDF = glm.area_change_glm(wafer_results, molten_particles)
+    if settings.Config.glmPredictorTesting:
+        wafer_results = predictor_testing(wafer_results, molten_particles)
+    else:
+        wafer_results = glm.count_loss_glm(wafer_results)  # this fits a glm to particle_loss (binomial data) with pre_count (n) and BDI as predictors. Standard residuals are taken as new (actual treatment-dependent) loss values.
+        wafer_results = glm.area_change_glm(wafer_results, molten_particles)
 
-    if Config.manualBDI:
+    if settings.Config.manualBDI:
         import BDI
         alpha, beta = BDI.optimise(wafer_results)  # runs a linear regression between differently calculated BDIs and particle_loss, it give back the alpha and beta paramters for the BDI calculation, that produced the highest correlation r value.
         wafer_results = BDI.make_BDI(wafer_results, alpha, beta)  # takes the optimised alpha, beta values and calculates the BDI for all wafers
 
     wafer_results = subtract_water(wafer_results)  # offset loss and change values by the respective negative control (water treatment)
 
-
-
-
-
-    if Config.semiMelted:
+    if settings.Config.semiMelted:
         wafer_results_wrangled = semiMelting(wafer_results)
     else:
         wafer_results_wrangled = doubleMelting(wafer_results)
-    return wafer_results_wrangled, wafer_images, paramsDF
+    return wafer_results_wrangled, wafer_images
