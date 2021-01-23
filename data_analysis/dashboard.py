@@ -34,7 +34,7 @@ def make_dashboard(waf, pam, particle_snips, wafer_images, outPath):
     # -------------
     quantHM = alt.Chart(waf).mark_rect().encode(
         alt.X('treatment:N', sort=['water', 'H2O2', 'KOH', 'Pentane', 'SPT', 'HCl'], axis=alt.Axis(title=None, orient="top", domain=False)),
-        opacity=alt.condition((alt.datum.pre_count >= Nselector.Ncutoff) & (alt.datum.BDI <= BDIselector.BDIcutoff), alt.value(1), alt.value(0.1))
+        opacity=alt.condition((alt.datum.pre_count >= Nselector.Ncutoff) & (alt.datum.BDI <= BDIselector.BDIcutoff), alt.value(1), alt.value(0))
     ).add_selection(
         modeSelector
     ).transform_filter(
@@ -82,12 +82,12 @@ def make_dashboard(waf, pam, particle_snips, wafer_images, outPath):
     # -------------
     waferScatter = alt.Chart(waf
     ).mark_point(filled=True).encode(
-        alt.X('matched_count'),#, scale=alt.Scale(domain=(0,450))),
+        alt.X('pre_count'),#, scale=alt.Scale(domain=(0,450))),
         alt.Y(alt.repeat('column'), type='quantitative', sort='ascending', axis=alt.Axis(format='%')),
         #alt.Y('particle_loss', sort='ascending'),
         color=alt.Color('treatment:N', legend=alt.Legend(orient='none', legendX=480, legendY=450)),
         size = alt.Size('BDI:Q', legend=alt.Legend(orient='none', legendX=-100, legendY=450), scale = alt.Scale(domain=(waf.BDI.min(), waf.BDI.max()))),
-        tooltip=['wafer', 'polymer', 'treatment', 'matched_count', alt.Tooltip(alt.repeat('column'), type='quantitative'), 'BDI:Q'],
+        tooltip=['wafer', 'polymer', 'treatment', 'pre_count', alt.Tooltip(alt.repeat('column'), type='quantitative'), 'BDI:Q'],
         #tooltip=['wafer', 'polymer', 'treatment', 'pre_count', 'particle_loss', 'BDI:Q'],
         opacity=alt.condition(treatSelector | polSelector, alt.value(1), alt.value(0.2))
     ).properties(

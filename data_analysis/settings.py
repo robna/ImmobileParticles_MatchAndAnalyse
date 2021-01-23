@@ -9,7 +9,8 @@ BDIdict = {
     5: 'post_histDelta',
     6: 'histDeltaDiff',
     7: 'histBGpeakSum',
-    8: 'histBGpeakDist'
+    8: 'histBGpeakDist',
+    9: 'histDeltaSum'
 }
 
 Ndict = {
@@ -20,9 +21,9 @@ Ndict = {
 
 drops = {
     'wafers': ['', ''],  # a list of wafer names to be dropped from analysis
-    'combis': [['',''], ['','']],  # alternatively to wafers lists with treatment and polymer can be used to drop these combinations (each list may include arbitrary numbers of polymers and treatments in arbitrary order)
-    'polymers': ['PS', 'PMMA', 'PVC', 'ABS'],  # a list of polymers to be dropped from analysis (all treatments)
-    'treatments': ['','']  # a list of treatments to be dropped from analysis (all polymers)
+    'combis': [['KOH', 'PET', 'PP'], ['', '']],  # alternatively to wafers lists with treatment and polymer can be used to drop these combinations (each list may include arbitrary numbers of polymers and treatments in arbitrary order)
+    'polymers': [''],  # ['PS', 'PMMA', 'PVC', 'ABS'],  # a list of polymers to be dropped from analysis (all treatments)
+    'treatments': ['', '']  # a list of treatments to be dropped from analysis (all polymers)
 }
 
 
@@ -33,12 +34,12 @@ class Config:
     semiMelted: bool = False  # semiMelted wafer df was used before glm corrections were included, now use doubleMelt
 
     minParameterForBDI: float = -10  # smallest number for alpha and beta in BDI optimisation (only used for manual BDI)
-    maxParameterForBDI: float = 11  # largest number for alpha and beta in BDI optimisation (only used for manual BDI)
+    maxParameterForBDI: float = 12  # largest number for alpha and beta in BDI optimisation (only used for manual BDI)
     stepParameterForBDI: float = 1.0  # step size for alpha and beta in BDI optimisation (only used for manual BDI)
     manualBDI: bool = True  # True means running BDI module for creating BDI, False takes values from relevant GLM
 
-    glmNpredictor: str = Ndict[1]  # what to use in GLM as a n-related predictor: one value of Ndict
-    glmImgQualiPredictors: list = [BDIdict[2], BDIdict[4]]  # 2 columns from wafer_results DF to be used as predictors, can be any of BDIdict
+    glmNpredictor: str = Ndict[0]  # what to use in GLM as a n-related predictor: one value of Ndict
+    glmImgQualiPredictors: list = [BDIdict[4]]  #, BDIdict[8] 2 columns from wafer_results DF to be used as predictors, can be any of BDIdict
 
     formulaBasedGLM: bool = True
     # countGLMformula: str = f'failure + success ~ {glmNpredictor} + ' \  # doesnt work with Predictor testing loops... formulas are defined in glm for now
@@ -48,6 +49,7 @@ class Config:
     #                       f'{glmImgQualiPredictors[0]} + ' \
     #                       f'{glmImgQualiPredictors[1]} '
 
+    glmOnTheWater: bool = True
     glmPredictorTesting: bool = False  # whether to test different input parameters for what make the best GLM model
     glmPlots: bool = True  # show GLM results as matplotlib figures
     useGLMpredIv: bool = False  # correct values with GLM fit based on upper limit of prediction interval (True) or fitted linearized regression (False)

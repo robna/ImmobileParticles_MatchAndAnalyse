@@ -7,33 +7,16 @@ import scipy.stats as stats
 import settings
 
 def paramsReport(fm, chichi):
-    paramsDF = pd.DataFrame({
-        'family': type(fm.family).__name__,
-        'intercept': 1 if len(fm.params) == 4 else 0,
-        'coeff_intercept': fm.params[0] if len(fm.params) == 4 else None,
-        'p_intercept': fm.pvalues[0] if len(fm.params) == 4 else None,
-        'Npredictor': settings.Config.glmNpredictor,
-        'coeff_Npredictor': fm.params[1 if len(fm.params) == 4 else 0],
-        'p_Npredictor': fm.pvalues[1 if len(fm.params) == 4 else 0],
-        'ImgQualiPredictor1': settings.Config.glmImgQualiPredictors[0],
-        'coeff_ImgQualiPredictor1': fm.params[2 if len(fm.params) == 4 else 1],
-        'p_ImgQualiPredictor1': fm.pvalues[2 if len(fm.params) == 4 else 1],
-        'ImgQualiPredictor2': settings.Config.glmImgQualiPredictors[1],
-        'coeff_ImgQualiPredictor2': fm.params[3 if len(fm.params) == 4 else 2],
-        'p_ImgQualiPredictor2': fm.pvalues[3 if len(fm.params) == 4 else 2],
-        'glmDeviance': fm.deviance,
-        'glmAIC': fm.aic,
-        'glmChiSqStats': chichi[0],
-        'p_glmChiSqStats': chichi[1],
-        'summary': fm.summary(),
-        'pSum': fm.pvalues.sum(),
-        'reduction': None
-    }, index=[settings.reports.GLMparams.index[-1]+1])  # index=settings.reports.GLMparams.index[-1]+1)
-
+    paramsDF = pd.DataFrame(pd.DataFrame([fm.params, fm.pvalues], index=['coeff', 'p']).unstack()).T
+    paramsDF.columns = [' '.join(col).strip() for col in paramsDF.columns.values]  # turn multilevel (hierachical) columns into flat columns by combining and repeating column name parts
+    paramsDF[['deviance', 'aic', 'reduction', 'pMean', 'family', 'summary']] = [fm.deviance, fm.aic, np.nan,
+                                                                                fm.pvalues.mean(),
+                                                                                type(fm.family).__name__, fm.summary()]
+    paramsDF.index = [settings.reports.GLMparams.index[-1]+1]
     settings.reports.GLMparams = settings.reports.GLMparams.append(paramsDF)
 
 
-def glmControlPlots(y, yAll, yhat, yhatAll, line_fit, meanRespAll, rr, iv_u, iv_l, iv_uAll, iv_lAll, rrivU, rrivL):
+def glmControlPlots(y, yAll, yhat, yhatAll, line_fit, meanRespAll, rr, rp, iv_u, iv_l, iv_uAll, iv_lAll, rrivU, rrivL):
     from matplotlib import pyplot as plt
     from textwrap import wrap
     from statsmodels.graphics.api import abline_plot
@@ -70,17 +53,19 @@ def glmControlPlots(y, yAll, yhat, yhatAll, line_fit, meanRespAll, rr, iv_u, iv_
     ax[0, 0].set_ylim(yAll.min() - (yAll.max()-yAll.min()) * 0.1, yAll.max() + (yAll.max()-yAll.min()) * 0.1)
     ax[0, 0].set_xlim(yhatAll.min() - (yhatAll.max()-yhatAll.min()) * 0.1, yhatAll.max() + (yhatAll.max()-yhatAll.min()) * 0.1)
 
-    # ax[0, 1].scatter(yhatAll, rr, s=50, color='C2')
+    ax[0, 1].scatter(yhat, rp, s=50, color='C2')
     # ax[0, 1].scatter(meanRespAll, rr, s=50, color='C2')
-    ax[0, 1].scatter(np.arange(1, len(yAll) + 1, 1), rr, s=50, color='C2')
+    # ax[0, 1].scatter(np.arange(1, len(yAll) + 1, 1), rr, s=50, color='C2')
     # ax[0, 1].bar(yhatAll, rr, color='C2', width=0.01)
     # ax[0, 1].bar(meanRespAll, rr, color='C2', width=0.005)
-    ax[0, 1].bar(np.arange(1, len(yAll) + 1, 1), rr, color='C2')
-    # ax[0, 1].hlines(0, min(yhatAll), max(yhatAll))
-    ax[0, 1].hlines(0, 0, len(yAll))
-    ax[0, 1].set_xlabel('id')
-    ax[0, 1].set_ylabel('Standard response residuals (corrected relative changes)')
-    ax[0, 1].set_title('Relative changes caused by treatment after GLM correction')
+    # ax[0, 1].bar(np.arange(1, len(yAll) + 1, 1), rr, color='C2')
+    ax[0, 1].hlines(0, min(yhat), max(yhat))
+    # ax[0, 1].hlines(0, 0, len(yAll))
+    ax[0, 1].set_xlabel('fitted values')
+    # ax[0, 1].set_ylabel('Standard response residuals (corrected relative changes)')
+    ax[0, 1].set_ylabel('Pearson residuals')
+    # ax[0, 1].set_title('Relative changes caused by treatment after GLM correction')
+    ax[0, 1].set_title('Residual Dependence Plot')
 
     ax[1, 0].scatter(np.arange(1, len(yAll) + 1, 1), ivs_sorted[:, 3])
     ax[1, 0].scatter(np.arange(1, len(yAll) + 1, 1), ivs_sorted[:, 0])
@@ -113,11 +98,10 @@ def prepare_df4glm(wafer_results):
 
 
 def make_glm_arrays(df4glm):
-    endog = np.asarray(df4glm.loc[df4glm.treatment == 'water', ['success', 'failure']])  # take only water for fitting the glm
+    endog = np.asarray(df4glm.loc[df4glm.treatment == 'water', ['success', 'failure']])  if settings.Config.glmOnTheWater else np.asarray(df4glm['success', 'failure'])# take only water for fitting the glm
     exog = np.asarray(df4glm.loc[df4glm.treatment == 'water', [settings.Config.glmNpredictor,
                               settings.Config.glmImgQualiPredictors[0],
-                              settings.Config.glmImgQualiPredictors[1]
-                              ]])  # take only water for fitting the glm
+                              settings.Config.glmImgQualiPredictors[1]]]) if settings.Config.glmOnTheWater else np.asarray(df4glm[settings.Config.glmNpredictor, settings.Config.glmImgQualiPredictors[0], settings.Config.glmImgQualiPredictors[1]])  # take only water for fitting the glm
     exogAll = np.asarray(df4glm.loc[:, [settings.Config.glmNpredictor,
                                         settings.Config.glmImgQualiPredictors[0],
                                         settings.Config.glmImgQualiPredictors[1]
@@ -159,6 +143,7 @@ def glm_residuals(fitted_model, endog, yAll, yhatAll):
         rr = np.maximum(yAll - yhatAll, 0)
 
     chichi = chiTest(y, yhat, ddof=0)
+    rp = fitted_model.resid_pearson
 
     line_fit = sm.OLS(y, sm.add_constant(yhat, prepend=True)).fit()  # make linear regression between original and fitted values
     meanRespAll = line_fit.predict(sm.add_constant(yhatAll))
@@ -186,7 +171,7 @@ def glm_residuals(fitted_model, endog, yAll, yhatAll):
         print(fitted_model.params)
 
     if settings.Config.glmPlots and not settings.Config.glmPredictorTesting:
-        glmControlPlots(y, yAll, yhat, yhatAll, line_fit, meanRespAll, rr, iv_u, iv_l, iv_uAll, iv_lAll,
+        glmControlPlots(y, yAll, yhat, yhatAll, line_fit, meanRespAll, rr, rp, iv_u, iv_l, iv_uAll, iv_lAll,
                         rrivU if settings.Config.useGLMpredIv else None,
                         rrivL if settings.Config.useGLMpredIv else None)
 
@@ -222,11 +207,11 @@ def glm_from_arrays(df4glm, originalDF):
 def glm_from_df(wafer_results):
     endogAll = np.asarray(wafer_results.particle_loss)  # = np.asarray(1 - df4glm['success'] / (df4glm['success'] + df4glm['failure']))
     df4glmAll = prepare_df4glm(wafer_results)
-    df4glm = df4glmAll.loc[df4glmAll.treatment == 'water']
+    df4glm = df4glmAll.loc[df4glmAll.treatment == 'water'] if settings.Config.glmOnTheWater else df4glmAll
     endog = np.asarray(df4glm.particle_loss)  # = np.asarray(1 - df4glm['success'] / (df4glm['success'] + df4glm['failure']))
     formula = f'failure + success ~ {settings.Config.glmNpredictor} + ' \
-              f'{settings.Config.glmImgQualiPredictors[0]} + ' \
-              f'{settings.Config.glmImgQualiPredictors[1]}'
+              f'{settings.Config.glmImgQualiPredictors[0]} '#+ ' \
+          #    f'{settings.Config.glmImgQualiPredictors[1]}'
     glm_binom = smf.glm(formula=formula, data=df4glm,
                         family=sm.families.Binomial()).fit()
     # yhatAll = np.asarray(1 / (1 + np.exp(
@@ -297,11 +282,13 @@ def area_change_glm(wafer_results, pam):
     else:
         wafer_results_AbsChange = wafer_results.copy()
         wafer_results_AbsChange.area_change = abs(wafer_results.area_change)
-        ww = wafer_results_AbsChange.loc[wafer_results_AbsChange.treatment == 'water']  # get water wafers
+        ww = wafer_results_AbsChange.loc[wafer_results_AbsChange.treatment == 'water'] if \
+            settings.Config.glmOnTheWater else wafer_results_AbsChange  # get water wafers
 
-        formula = f'area_change ~ {settings.Config.glmNpredictor} +' \
-                  f' {settings.Config.glmImgQualiPredictors[0]} +' \
-                  f' {settings.BDIdict[8]}'  # with "-1" in the end to run without constant term
+        formula = f'area_change ~ {settings.Config.glmNpredictor} + ' \
+                  f'{settings.Config.glmImgQualiPredictors[0]} '#+ '  \
+                #  f'{settings.Config.glmImgQualiPredictors[1]}'  # with "-1" in the end to run without constant term
+
 
         link_g = sm.genmod.families.links.inverse_squared
         glm_gauss = smf.glm(formula=formula, data=ww, family=sm.families.Gaussian())
@@ -346,8 +333,8 @@ def area_change_RepeatedMeasuresGlm(wafer_results, pam):  # TODO: taking absolut
     # wafer_results['area_change_glmCorrected'] = wafer_results['area_change']   # for now just add same column. We can add a glm correction for area later if we need it
 
     pam = pd.merge(pam, wafer_results, on=['wafer', 'polymer', 'treatment'], how='left').dropna()
-    paw = pam.loc[(pam['prop'] == 'area') & (pam['treatment'] == 'water')]
     paa = pam.loc[pam['prop'] == 'area']
+    paw = pam.loc[(pam['prop'] == 'area') & (pam['treatment'] == 'water')] if settings.Config.glmOnTheWater else paa
 
     formula = f'change ~ {settings.Config.glmNpredictor} +' \
               f' {settings.Config.glmImgQualiPredictors[0]} +' \
