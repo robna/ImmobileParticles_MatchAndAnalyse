@@ -5,21 +5,22 @@ import pandas as pd
 from statsmodels.sandbox.regression.predstd import wls_prediction_std
 import scipy.stats as stats
 import settings
+from matplotlib import pyplot as plt
+from textwrap import wrap
+from statsmodels.graphics.api import abline_plot
+
 
 def paramsReport(fm, chichi):
     paramsDF = pd.DataFrame(pd.DataFrame([fm.params, fm.pvalues], index=['coeff', 'p']).unstack()).T
     paramsDF.columns = [' '.join(col).strip() for col in paramsDF.columns.values]  # turn multilevel (hierachical) columns into flat columns by combining and repeating column name parts
-    paramsDF[['deviance', 'aic', 'reduction', 'pMean', 'family', 'summary']] = [fm.deviance, fm.aic, np.nan,
-                                                                                fm.pvalues.mean(),
+    paramsDF[['deviance', 'aic', 'reduction', 'pMean', 'pMax', 'family', 'summary']] = [fm.deviance, fm.aic, np.nan,
+                                                                                fm.pvalues.mean(), fm.pvalues.max(),
                                                                                 type(fm.family).__name__, fm.summary()]
     paramsDF.index = [settings.reports.GLMparams.index[-1]+1]
     settings.reports.GLMparams = settings.reports.GLMparams.append(paramsDF)
 
 
-def glmControlPlots(y, yAll, yhat, yhatAll, line_fit, meanRespAll, rr, rp, iv_u, iv_l, iv_uAll, iv_lAll, rrivU, rrivL):
-    from matplotlib import pyplot as plt
-    from textwrap import wrap
-    from statsmodels.graphics.api import abline_plot
+def glmControlPlots(fitted_model, y, yAll, yhat, yhatAll, line_fit, meanRespAll, rr, rp, iv_u, iv_l, iv_uAll, iv_lAll, rrivU, rrivL):
 
     # df = pd.DataFrame({'yAll': yAll, 'yhatAll': yhatAll,
     #                    'meanRespAll': meanRespAll, 'rr': rr,
@@ -85,6 +86,13 @@ def glmControlPlots(y, yAll, yhat, yhatAll, line_fit, meanRespAll, rr, rp, iv_u,
     ax[1, 1].set_title("\n".join(wrap(
         'Relative changes: original (tops), attributed to n and image quality (upper bar) and attributed to treatment effects (bottom bar)',
         80)))
+
+    textstr1 = f'Family: {type(fitted_model.family).__name__},    Link: {type(fitted_model.family.link).__name__}  \nFormula: {fitted_model.model.formula} \nDeviance: {fitted_model.deviance.round(2)}'
+    textstr2 = f'                       Coefficients \n{fitted_model.params.round(4).to_string()}'
+    textstr3 = f'                       p-Values \n{fitted_model.pvalues.round(3).to_string()}'
+    plt.gcf().text(0.05, 0.92, textstr1, fontsize=16)
+    plt.gcf().text(0.6, 0.92, textstr2, fontsize=14)
+    plt.gcf().text(0.8, 0.92, textstr3, fontsize=14)
     fig.show()
     plt.show(block=True)
     return
@@ -166,12 +174,12 @@ def glm_residuals(fitted_model, endog, yAll, yhatAll):
     #       f'{settings.Config.glmImgQualiPredictors[0]}   and   {settings.Config.glmImgQualiPredictors[1]}')
 
     if not settings.Config.glmPredictorTesting:
-        print(fitted_model.summary())
+        print(fitted_model.summary2())
     else:
         print(fitted_model.params)
 
     if settings.Config.glmPlots and not settings.Config.glmPredictorTesting:
-        glmControlPlots(y, yAll, yhat, yhatAll, line_fit, meanRespAll, rr, rp, iv_u, iv_l, iv_uAll, iv_lAll,
+        glmControlPlots(fitted_model, y, yAll, yhat, yhatAll, line_fit, meanRespAll, rr, rp, iv_u, iv_l, iv_uAll, iv_lAll,
                         rrivU if settings.Config.useGLMpredIv else None,
                         rrivL if settings.Config.useGLMpredIv else None)
 
@@ -209,9 +217,9 @@ def glm_from_df(wafer_results):
     df4glmAll = prepare_df4glm(wafer_results)
     df4glm = df4glmAll.loc[df4glmAll.treatment == 'water'] if settings.Config.glmOnTheWater else df4glmAll
     endog = np.asarray(df4glm.particle_loss)  # = np.asarray(1 - df4glm['success'] / (df4glm['success'] + df4glm['failure']))
-    formula = f'failure + success ~ {settings.Config.glmNpredictor} + ' \
-              f'{settings.Config.glmImgQualiPredictors[0]} '#+ ' \
-          #    f'{settings.Config.glmImgQualiPredictors[1]}'
+    formula = f'failure + success ~ {settings.Ndict[0]} + ' \
+              f'{settings.BDIdict[5]}  ' \
+            #  f'{settings.BDIdict[6]}'
     glm_binom = smf.glm(formula=formula, data=df4glm,
                         family=sm.families.Binomial()).fit()
     # yhatAll = np.asarray(1 / (1 + np.exp(
@@ -251,7 +259,7 @@ def count_loss_glm(wafer_results):
                                                                   particle_losses_by_predictors,
                                                                   particle_losses_by_predictors_upperInterval,
                                                                   particle_losses_by_predictors_lowerInterval],
-                                                                 columns=['particle_loss_glmCorrected',
+                                                                 columns=['particle_loss_glm_corrected',
                                                                           'confounder_caused_particle_loss',
                                                                           'upperPredIntv_confounder_caused_particle_loss',
                                                                           'lowerPredIntv_confounder_caused_particle_loss'],
@@ -266,8 +274,9 @@ def count_loss_glm(wafer_results):
         glm_corrected_particle_losses_df['IQI'] = glm_corrected_particle_losses_df['BDI'].max() -\
                                                   glm_corrected_particle_losses_df['BDI']
 
-    settings.reports.GLMparams.loc[settings.reports.GLMparams.index[-1], 'reduction'] = \
-        abs(glm_corrected_particle_losses_df.particle_loss_glmCorrected).sum() / abs(wafer_results.particle_loss).sum() - 1
+    reduction = abs(glm_corrected_particle_losses_df.particle_loss_glm_corrected).sum() / abs(wafer_results.particle_loss).sum() - 1
+    settings.reports.GLMparams.loc[settings.reports.GLMparams.index[-1], 'reduction'] = reduction
+    # plt.gcf().text(0.65, 0.08, f'Reduction:   {reduction}', fontsize=16)
     try:
         wafer_results = pd.concat([wafer_results, glm_corrected_particle_losses_df], axis=1, verify_integrity=True)
     except ValueError:
@@ -286,12 +295,12 @@ def area_change_glm(wafer_results, pam):
             settings.Config.glmOnTheWater else wafer_results_AbsChange  # get water wafers
 
         formula = f'area_change ~ {settings.Config.glmNpredictor} + ' \
-                  f'{settings.Config.glmImgQualiPredictors[0]} '#+ '  \
-                #  f'{settings.Config.glmImgQualiPredictors[1]}'  # with "-1" in the end to run without constant term
+                  f'{settings.Config.glmImgQualiPredictors[1]}'  \
+                  # f'{settings.Config.glmImgQualiPredictors[1]}'  # with "-1" in the end to run without constant term
 
 
-        link_g = sm.genmod.families.links.inverse_squared
-        glm_gauss = smf.glm(formula=formula, data=ww, family=sm.families.Gaussian())
+        link_g = sm.genmod.families.links.identity
+        glm_gauss = smf.glm(formula=formula, data=ww, family=sm.families.Gamma(link_g()))
         fitted_gauss = glm_gauss.fit()
 
         yAll = np.asarray(wafer_results_AbsChange['area_change'])
@@ -311,36 +320,42 @@ def area_change_glm(wafer_results, pam):
                                            yhatAll,
                                            area_changes_by_predictors_upperInterval,
                                            area_changes_by_predictors_lowerInterval],
-                                          columns=['area_change_glmCorrected',
+                                          columns=['area_change_glm_corrected',
                                                    'confounder_caused_area_change',
                                                    'upperPredIntv_confounder_caused_area_change',
                                                    'lowerPredIntv_confounder_caused_area_change'],
                                           index=wafer_results.index)
-        gc_ac.loc[wafer_results.area_change < 0, 'area_change_glmCorrected'] *= -1
-        gc_ac.loc[wafer_results.area_change < 0, 'confounder_caused_area_change'] *= -1
+        gc_ac.loc[wafer_results.area_change < 0, 'area_change_glm_corrected'] *= -1  # reverse absolutation
+        gc_ac.loc[wafer_results.area_change < 0, 'confounder_caused_area_change'] *= -1  # reverse absolutation
         try:  # this error exception is needed to run the glm parameter testing loops
             wafer_results = pd.concat([wafer_results, gc_ac], axis=1, verify_integrity=True)
         except ValueError:
             pass
-            # wafer_results['area_change_glmCorrected'] = wafer_results['area_change']   # activate this instead of the glm, to run without area glm correction
+            # wafer_results['area_change_glm_corrected'] = wafer_results['area_change']   # activate this instead of the glm, to run without area glm correction
         paramsReport(fitted_gauss, chichi)
-        settings.reports.GLMparams.loc[settings.reports.GLMparams.index[-1], 'reduction'] =\
-            abs(gc_ac.area_change_glmCorrected).sum() / abs(wafer_results.area_change).sum() - 1
+        reduction = abs(gc_ac.area_change_glm_corrected).sum() / abs(wafer_results.area_change).sum() - 1
+        settings.reports.GLMparams.loc[settings.reports.GLMparams.index[-1], 'reduction'] = reduction
+        # plt.gcf().text(0.65, 0.08, f'Reduction:   {reduction}', fontsize=16)
     return wafer_results
 
 
 def area_change_RepeatedMeasuresGlm(wafer_results, pam):  # TODO: taking absolute area changes is not yet implemented in single particle based area glm
-    # wafer_results['area_change_glmCorrected'] = wafer_results['area_change']   # for now just add same column. We can add a glm correction for area later if we need it
+    # wafer_results['area_change_glm_corrected'] = wafer_results['area_change']   # for now just add same column. We can add a glm correction for area later if we need it
 
     pam = pd.merge(pam, wafer_results, on=['wafer', 'polymer', 'treatment'], how='left').dropna()
     paa = pam.loc[pam['prop'] == 'area']
-    paw = pam.loc[(pam['prop'] == 'area') & (pam['treatment'] == 'water')] if settings.Config.glmOnTheWater else paa
+
+    paa_AbsChange = paa.copy()
+    paa_AbsChange.change = abs(paa_AbsChange.change)
+
+    paw = paa_AbsChange.loc[paa_AbsChange['treatment'] == 'water'] if settings.Config.glmOnTheWater else paa_AbsChange
 
     formula = f'change ~ {settings.Config.glmNpredictor} +' \
-              f' {settings.Config.glmImgQualiPredictors[0]} +' \
-              f' {settings.Config.glmImgQualiPredictors[1]}'  # with "-1" in the end to run without constant term
+              f' {settings.Config.glmImgQualiPredictors[1]} ' \
+              # f' {settings.Config.glmImgQualiPredictors[1]}'  # with "-1" in the end to run without constant term
 
-    glm_gauss = smf.glm(formula=formula, data=paw, family=sm.families.Gaussian())
+    link_g = sm.genmod.families.links.identity
+    glm_gauss = smf.glm(formula=formula, data=paw, family=sm.families.Gamma(link_g()))
 
     fitted_gauss = glm_gauss.fit()
 
@@ -361,17 +376,19 @@ def area_change_RepeatedMeasuresGlm(wafer_results, pam):  # TODO: taking absolut
                                        yhatAll,
                                        area_changes_by_predictors_upperInterval,
                                        area_changes_by_predictors_lowerInterval],
-                                      columns=['area_change_glmCorrected',
+                                      columns=['area_change_glm_corrected',
                                                'confounder_caused_area_change',
                                                'upperPredIntv_confounder_caused_area_change',
                                                'lowerPredIntv_confounder_caused_area_change'],
                                       index=paa.index)
+    gc_ac.loc[paa.change < 0, 'area_change_glm_corrected'] *= -1  # reverse absolutation
+    gc_ac.loc[paa.change < 0, 'confounder_caused_area_change'] *= -1  # reverse absolutation
     par = pd.concat([paa, gc_ac], axis=1)
 
     area_wafer_groups = par.groupby('wafer')
     for w, waf in area_wafer_groups:  # cycle through polymer groups
-        area_change_glmCorrected_mean = waf.area_change_glmCorrected.mean()
-        wafer_results.loc[(wafer_results.wafer == w), 'area_change_glmCorrected'] = area_change_glmCorrected_mean
+        area_change_glm_corrected_mean = waf.area_change_glm_corrected.mean()
+        wafer_results.loc[(wafer_results.wafer == w), 'area_change_glm_corrected'] = area_change_glm_corrected_mean
         confounder_caused_area_change_mean = waf.confounder_caused_area_change.mean()
         wafer_results.loc[(wafer_results.wafer == w), 'confounder_caused_area_change'] = confounder_caused_area_change_mean
         upperPredIntv_confounder_caused_area_change_mean = waf.upperPredIntv_confounder_caused_area_change.mean()
@@ -380,4 +397,6 @@ def area_change_RepeatedMeasuresGlm(wafer_results, pam):  # TODO: taking absolut
         wafer_results.loc[(wafer_results.wafer == w), 'lowerPredIntv_confounder_caused_area_change'] = lowerPredIntv_confounder_caused_area_change_mean
 
     paramsReport(fitted_gauss, chichi)
+    settings.reports.GLMparams.loc[settings.reports.GLMparams.index[-1], 'reduction'] = \
+        abs(gc_ac.area_change_glm_corrected).sum() / abs(wafer_results.area_change).sum() - 1
     return wafer_results

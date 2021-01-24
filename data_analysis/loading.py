@@ -18,7 +18,7 @@ def load_csv_results(path):
 
     snips_path = latest_file(Path(path),'particle_snips*.csv')
     print (f'Snips file used is:   {snips_path.name}')
-    particle_snips = pd.read_csv(snips_path)
+    particle_snips = pd.read_csv(snips_path).dropna()  # dropna: only keep snips of particles that were matched
 
     return wafer_results, particle_results, particle_snips
 

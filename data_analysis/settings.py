@@ -26,6 +26,12 @@ drops = {
     'treatments': ['', '']  # a list of treatments to be dropped from analysis (all polymers)
 }
 
+plotDrops = {
+    'wafers': ['', ''],  # a list of wafer names to be dropped from analysis
+    'combis': [['KOH', 'PET', 'PP'], ['', '']],  # alternatively to wafers lists with treatment and polymer can be used to drop these combinations (each list may include arbitrary numbers of polymers and treatments in arbitrary order)
+    'polymers': [''],  # ['PS', 'PMMA', 'PVC', 'ABS'],  # a list of polymers to be dropped from analysis (all treatments)
+    'treatments': ['', '']  # a list of treatments to be dropped from analysis (all polymers)
+}
 
 class Config:
     """
@@ -33,13 +39,13 @@ class Config:
     """
     semiMelted: bool = False  # semiMelted wafer df was used before glm corrections were included, now use doubleMelt
 
-    minParameterForBDI: float = -10  # smallest number for alpha and beta in BDI optimisation (only used for manual BDI)
+    minParameterForBDI: float = 0  # smallest number for alpha and beta in BDI optimisation (only used for manual BDI)
     maxParameterForBDI: float = 12  # largest number for alpha and beta in BDI optimisation (only used for manual BDI)
     stepParameterForBDI: float = 1.0  # step size for alpha and beta in BDI optimisation (only used for manual BDI)
     manualBDI: bool = True  # True means running BDI module for creating BDI, False takes values from relevant GLM
 
-    glmNpredictor: str = Ndict[0]  # what to use in GLM as a n-related predictor: one value of Ndict
-    glmImgQualiPredictors: list = [BDIdict[4]]  #, BDIdict[8] 2 columns from wafer_results DF to be used as predictors, can be any of BDIdict
+    glmNpredictor: str = Ndict[1]  # what to use in GLM as a n-related predictor: one value of Ndict
+    glmImgQualiPredictors: list = [BDIdict[4], BDIdict[8]] # 2 columns from wafer_results DF to be used as predictors, can be any of BDIdict
 
     formulaBasedGLM: bool = True
     # countGLMformula: str = f'failure + success ~ {glmNpredictor} + ' \  # doesnt work with Predictor testing loops... formulas are defined in glm for now

@@ -7,8 +7,8 @@ import settings
 # some abbreviations
 pl = 'particle_loss'
 ac = 'area_change'
-gC = '_glmCorrected'
-wC = '_waterCorrected'
+gC = '_glm_corrected'
+wC = '_water_corrected'
 w = 'water'
 prc = 'pre_count'
 poc = 'post_count'
@@ -23,9 +23,9 @@ def get_areas_from_particles(wafer_results, molten_particles):
     particle_wafer_groups = molten_particles_matched_only.loc[molten_particles_matched_only.prop == 'area'].groupby('wafer')  # grouping by wafer: only particles that matched between pre and post are used here
     for w, waf in particle_wafer_groups:  # cycle through polymer groups
         pre_area_matched_mean = waf.preValue.mean()
-        wafer_results.loc[(wafer_results.wafer == w), 'pre_area_matched'] = round(pre_area_matched_mean)
+        wafer_results.loc[(wafer_results.wafer == w), 'pre_area_matched'] = pre_area_matched_mean
         post_area_matched_mean = waf.postValue.mean()
-        wafer_results.loc[(wafer_results.wafer == w), 'post_area_matched'] = round(post_area_matched_mean)
+        wafer_results.loc[(wafer_results.wafer == w), 'post_area_matched'] = post_area_matched_mean
 
     wafer_results[pl] = abs(wafer_results.matched_count / wafer_results.pre_count - 1)  # Get normalised particle losses for each wafer: counts of particles in pre state divided by counts in post state. Subtract 1 to normalise. Take absolute value to treat particle loss and particle addition as the same.
     wafer_results[ac] = wafer_results.post_area_matched / wafer_results.pre_area_matched - 1  # same for area...
@@ -39,13 +39,13 @@ def subtract_water(wafer_results):
     for _, pol in wafer_polymer_groups:  # cycle through polymer groups
         pol[pl + wC] = pol.loc[pol.treatment != w, pl] - pol.loc[pol.treatment == w, pl].iloc[0]  # subtract particle loss of water from particle losses of all other treatments to get the percentage point error (meaning loss OR addition) of particle numbers caused by each treatment
         pol[ac + wC] = pol.loc[pol.treatment != w, ac] - pol.loc[pol.treatment == w, ac].iloc[0]  # same for area
-        pol[pl + gC + wC] = pol.loc[pol.treatment != w, pl + gC] - pol.loc[pol.treatment == w, pl + gC].iloc[0]  # subtract particle loss of water from particle losses of all other treatments to get the percentage point error (meaning loss OR addition) of particle numbers caused by each treatment
-        pol[ac + gC + wC] = pol.loc[pol.treatment != w, ac + gC] - pol.loc[pol.treatment == w, ac + gC].iloc[0]  # same for area
+        pol[pl + gC + '_and' + wC] = pol.loc[pol.treatment != w, pl + gC] - pol.loc[pol.treatment == w, pl + gC].iloc[0]  # subtract particle loss of water from particle losses of all other treatments to get the percentage point error (meaning loss OR addition) of particle numbers caused by each treatment
+        pol[ac + gC + '_and' + wC] = pol.loc[pol.treatment != w, ac + gC] - pol.loc[pol.treatment == w, ac + gC].iloc[0]  # same for area
 
         pol.loc[(pol[pl + wC] < 0), pl + wC] = 0  # set all ratios that were smaller than water ratio (and thus got now negative due to water ratio correction) to 0.
         # pol.loc[(pol[ac + wC] > 0), ac + wC] = 0  # same for area
-        pol.loc[(pol[pl + gC + wC] < 0), pl + gC + wC] = 0  # set all ratios that were smaller than water ratio (and thus got now negative due to water ratio correction) to 0.
-        # pol.loc[(pol[ac + gC + wC] > 0), ac + gC + wC] = 0  # same for area
+        pol.loc[(pol[pl + gC + '_and' + wC] < 0), pl + gC + '_and' + wC] = 0  # set all ratios that were smaller than water ratio (and thus got now negative due to water ratio correction) to 0.
+        # pol.loc[(pol[ac + gC + '_and' + wC] > 0), ac + gC + '_and' + wC] = 0  # same for area
 
 
         mcw = pol.loc[pol.treatment == w, mc]  # matched_count of the water treatment of the current polymer
@@ -55,10 +55,16 @@ def subtract_water(wafer_results):
         mcgCts = pol.loc[pol.treatment != w, mc + gC]
         prcts = pol.loc[pol.treatment != w, prc]
         pol[mc + wC] = round(mcts + prcts - prcts.apply(lambda x: x * mcw / prcw).iloc[:, 0])
-        pol[mc + gC + wC] = round(mcgCts + prcts - prcts.apply(lambda x: x * mcgCw / prcw).iloc[:, 0])
+        pol[mc + gC + '_and' + wC] = round(mcgCts + prcts - prcts.apply(lambda x: x * mcgCw / prcw).iloc[:, 0])
 
-        # pol[poam + wC] = round(pol.loc[pol.treatment != w, poam] / pol.loc[pol.treatment != w, pram] - pol.loc[pol.treatment == w, poam] / pol.loc[pol.treatment == w, pram] - pol.loc[pol.treatment != w, pram])
-        # pol[poam + gC + wC] = round(pol.loc[pol.treatment != w, poam + gC] / pol.loc[pol.treatment != w, pram] - pol.loc[pol.treatment == w, poam + gC] / pol.loc[pol.treatment == w, pram] - pol.loc[pol.treatment != w, pram])
+        pramw = pol.loc[pol.treatment == w, pram]
+        poamw = pol.loc[pol.treatment == w, poam]
+        poamgCw = pol.loc[pol.treatment == w, poam + gC]
+        pramts = pol.loc[pol.treatment != w, pram]
+        poamts = pol.loc[pol.treatment != w, poam]
+        poamgCts = pol.loc[pol.treatment != w, poam + gC]
+        pol[poam + wC] = round(poamts + pramts - pramts.apply(lambda x: x * poamw / pramw).iloc[:, 0])
+        pol[poam + gC + '_and' + wC] = round(poamgCts + pramts - pramts.apply(lambda x: x * poamgCw / pramw).iloc[:, 0])
 
         wafer_results_wrangled = wafer_results_wrangled.append(pol)  # save results to df
     return wafer_results_wrangled
@@ -75,21 +81,19 @@ def semiMelting(wafer_results_wrangled):
     waterCorr_wafer_results.rename(columns={
         pl + wC: pl,
         ac + wC: ac,
-        pl + gC + wC: pl + gC,
-        ac + gC + wC: ac + gC}, inplace=True)
+        pl + gC + '_and' + wC: pl + gC,
+        ac + gC + '_and' + wC: ac + gC}, inplace=True)
     waterCorr_wafer_results['mode'] = 'water_corrected'
 
-    nonCorr_wafer_results = wafer_results_wrangled.drop([pl + wC, ac + wC, pl + gC + wC, ac + gC + wC], axis=1).copy()
+    nonCorr_wafer_results = wafer_results_wrangled.drop([pl + wC, ac + wC, pl + gC + '_and' + wC, ac + gC + '_and' + wC], axis=1).copy()
     nonCorr_wafer_results['mode'] = 'non_corrected'
     semiMelted_wafers = pd.concat([waterCorr_wafer_results, nonCorr_wafer_results])
     return semiMelted_wafers
 
 
 def meltHelper(df, value_name):
-    dfMelt = df.melt(id_vars=['wafer', 'polymer', 'treatment', 'pre_count', 'post_count', 'matched_count',
-                              'pre_area_matched', 'post_area_matched', 'BDI', 'IQI',
-                              #'pre_image', 'post_image'
-                             ],
+    dfMelt = df.melt(id_vars=['wafer', 'polymer', 'treatment', 'pre_count', 'post_count',
+                              'pre_area_matched', 'BDI'],
                     value_vars=['non_corrected', 'glm_corrected', 'water_corrected', 'glm_and_water_corrected'],
                     var_name='mode', value_name=value_name)
     return dfMelt
@@ -97,22 +101,22 @@ def meltHelper(df, value_name):
 
 def nameHelper(df, att):
     dfRenamed = df.rename(columns={att: 'non_corrected',
-                                   att + '_glmCorrected': 'glm_corrected',
-                                   att + '_waterCorrected': 'water_corrected',
-                                   att + '_glmCorrected_waterCorrected': 'glm_and_water_corrected'})
+                                   att + '_glm_corrected': 'glm_corrected',
+                                   att + '_water_corrected': 'water_corrected',
+                                   att + '_glm_corrected_and_water_corrected': 'glm_and_water_corrected'})
     return dfRenamed
 
 
-def doubleMelting(wafer_results_wrangled):
-    countNamed = nameHelper(wafer_results_wrangled, att='particle_loss')
-    countMelt = meltHelper(countNamed, value_name='particle_loss')
-    areaNamed = nameHelper(wafer_results_wrangled, att='area_change')
-    areaMelt = meltHelper(areaNamed, value_name='area_change')
-    areaMelt.drop(columns=['wafer', 'polymer', 'treatment', 'pre_count', 'post_count', 'matched_count',
-                           'pre_area_matched', 'post_area_matched', 'BDI', 'IQI',
-                           #'pre_image', 'post_image',
-                           'mode'], inplace=True)
-    doubleMelt = pd.concat([countMelt, areaMelt], axis=1)
+def doubleMelting(wr):
+    col_nam = ['particle_loss', 'area_change', 'matched_count', 'post_area_matched', 'count_signiFi']
+    doubleMelt = pd.DataFrame()
+    for meltee in col_nam:
+        named = nameHelper(wr, att=meltee)
+        nowMelt = meltHelper(named, value_name=meltee)
+        if meltee != 'particle_loss':
+            nowMelt.drop(columns=['wafer', 'polymer', 'treatment', 'pre_count', 'post_count',
+                                  'pre_area_matched', 'BDI', 'mode'], inplace=True)
+        doubleMelt = pd.concat([doubleMelt, nowMelt], axis=1)
     return doubleMelt
 
 
@@ -123,7 +127,7 @@ def dropping(wafer_results):
     for d in settings.drops['wafers']:
         wafer_results.drop(wafer_results.loc[(wafer_results.wafer == d)].index, inplace=True)
     for d in settings.drops['combis']:
-        wafer_results.drop(wafer_results.loc[(wafer_results.treatment.isin(d)) &\
+        wafer_results.drop(wafer_results.loc[(wafer_results.treatment.isin(d)) & \
                                              (wafer_results.polymer.isin(d))].index, inplace=True)
     for d in settings.drops['polymers']:
         wafer_results.drop(wafer_results.loc[(wafer_results.polymer == d)].index, inplace=True)
@@ -148,18 +152,23 @@ def predictor_testing(wafer_results, molten_particles):
 
 def fisherStats(wr):
     polygroups = wr.groupby('polymer')
-    for p, pol in polygroups:
-        for cm in ['', gC, wC, gC + wC]:
-            wr[mc + cm + '_signi'] = np.nan
+    for cm in ['', gC, wC, gC + '_and' + wC]:
+        for p, pol in polygroups:
             for tr in pol.treatment.unique():
+                prc_tr = pol.loc[pol.treatment == tr, prc].iloc[0]  # pre_count
+                success_tr = pol.loc[pol.treatment == tr, mc + cm].iloc[0]  # success = matched_count
+                if np.isnan(success_tr) or success_tr > prc_tr:
+                    success_tr = prc_tr
+                failure_tr = prc_tr - success_tr  # failure = pre_count - success
+                prc_w = pol.loc[pol.treatment == w, prc].iloc[0]
+                success_w = pol.loc[pol.treatment == w, mc + cm].iloc[0]
+                if np.isnan(success_w) or success_w > prc_w:
+                    success_w = prc_w
+                failure_w = prc_w - success_w
                 _, pvalue = stats.fisher_exact(
-                    [[pol.loc[pol.treatment == tr, mc + cm],
-                     pol.loc[pol.treatment == tr, prc] -
-                     pol.loc[pol.treatment == tr, mc + cm]],
-                    [pol.loc[pol.treatment == w, mc + cm],
-                     pol.loc[pol.treatment == w, prc] -
-                     pol.loc[pol.treatment == w, mc + cm]]])
-                wr.loc[(wr.polymer == p) & (wr.treatment == tr), mc + cm + '_signi'] = pvalue
+                    [[success_tr, failure_tr], [success_w, failure_w]],
+                    alternative='less')
+                wr.loc[(wr.polymer == p) & (wr.treatment == tr), 'count_signiFi' + cm] = pvalue
     return(wr)
 
 
@@ -191,11 +200,13 @@ def wafer_wrangling(wafer_results, molten_particles):
         import BDI
         alpha, beta = BDI.optimise(wafer_results)  # runs a linear regression between differently calculated BDIs and particle_loss, it give back the alpha and beta paramters for the BDI calculation, that produced the highest correlation r value.
         wafer_results = BDI.make_BDI(wafer_results, alpha, beta)  # takes the optimised alpha, beta values and calculates the BDI for all wafers
+    wafer_results['BDI'] = wafer_results.BDI / wafer_results.BDI.max() * 100  # make BDI go from 0 to 100
+    # wafer_results['BDI'] = np.sort(np.asarray(wafer_results.BDI).ravel()).searchsorted(np.asarray(wafer_results.BDI))  # equalise BDI in range
 
     wafer_results = countAndArea_glmCorrecting(wafer_results)
     wafer_results = subtract_water(wafer_results)  # offset loss and change values by the respective negative control (water treatment)
 
-    # wafer_results = fisherStats(wafer_results)
+    wafer_results = fisherStats(wafer_results)
 
     if settings.Config.semiMelted:
         wafer_results_wrangled = semiMelting(wafer_results)
