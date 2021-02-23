@@ -47,6 +47,7 @@ def make_BDI(df, alpha=1, beta=1):
 
     df['BDI'] = alpha * (df.pre_histBGpeak + df.post_histBGpeak) + beta * abs(
         df.pre_histBGpeak - df.post_histBGpeak)
+    # df['BDI'] = alpha * df.pre_histDelta + beta * df.histBGpeakDist
     df['IQI'] = alpha * (df.post_histDelta + df.pre_histDelta) - beta * df.histDeltaDiff
     # df['IQI'] = df['BDI'].max() - df['BDI']
 

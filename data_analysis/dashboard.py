@@ -15,9 +15,9 @@ def make_dashboard(waf, pam, particle_snips, wafer_images, outPath):
     waf['post_area_matched'] = waf['post_area_matched'].round()
 
     pam = pam.dropna()
-    pam.loc[:, 'preValue'] = pam.loc[:, 'preValue'].astype(int)
-    pam.loc[:, 'postValue'] = pam.loc[:, 'postValue'].astype(int)
+    pam = pam.astype({'preValue': int, 'postValue': int})
 
+    asterisk = "M0,.5L.6,.8L.5,.1L1,-.3L.3,-.4L0,-1L-.3,-.4L-1,-.3L-.5,.1L-.6,.8L0,.5Z"  # svg path for asterisk to denote significant changes (should be on a -1 to 1 xy canvas to work)
 
     # ===================
     # Altair result plots
@@ -35,14 +35,15 @@ def make_dashboard(waf, pam, particle_snips, wafer_images, outPath):
     particleprop_dropdown = alt.binding_select(options=['area', 'perimeter', 'intensity'], name='Particle property')
     particleprop_select = alt.selection_single(fields=['prop'], bind=particleprop_dropdown, init={'prop': 'area'})
     BDIslider = alt.binding_range(min=waf.BDI.min(), max=waf.BDI.max(), step=(waf.BDI.max() - waf.BDI.min()) / 100, name="show wafers with BDI ≤")
-    BDIselector = alt.selection_single(fields=['BDIcutoff'], bind=BDIslider, init={'BDIcutoff': waf.BDI.max()})
+    BDIselector = alt.selection_single(fields=['BDIcutoff'], bind=BDIslider, init={'BDIcutoff': 27})
     Nslider = alt.binding_range(min=waf.matched_count.min(), max=waf.matched_count.max(), step=1, name="show wafers with matched_count ≥")
     Nselector = alt.selection_single(fields=['Ncutoff'], bind=Nslider, init={'Ncutoff': waf.matched_count.min()})
     # prepostSelector_radio = alt.binding_radio(options=['pre_image', 'post_image'], name='Image:   ')
     # prepostSelector = alt.selection_single(fields=['key'], bind=prepostSelector_radio, init={'key': 'pre_image'})
     prepostSelector = alt.selection_single(fields=['key'], init={'key': 'pre_image'})  #, empty='init')
     # polymerExcluder_boxes = alt.binding_checkbox()
-    # polymerExcluder = alt.selection_multi(fields=['polymer'], bind=polymerExcluder_boxes)
+    # polymerExcluder = alt.selection_single(fields=['polymer'], bind=polymerExcluder_boxes)
+    excluder = alt.selection_multi(fields=['wafer'], on="dblclick", clear="keydown[event.r]", toggle=True)
 
 
 
@@ -60,45 +61,92 @@ def make_dashboard(waf, pam, particle_snips, wafer_images, outPath):
     ).add_selection(
         pickedY,
         pickedX
+    ).add_selection(
+        excluder
+    ).transform_filter(
+        ~excluder
     )
 
     countHM = quantHM.encode(
         alt.Y('polymer:N', sort=['ABS', 'EVA', 'LDPE', 'PA6', 'PC', 'PET', 'PMMA', 'PP', 'PS', 'PVC', 'TPU', 'Acrylate', 'Epoxy'], axis=alt.Axis(title=None, orient="left", domain=False)),
         color=alt.Color(
             'particle_loss:Q',
-            scale=alt.Scale(scheme='lightmulti', domain=(1, 0), clamp=True),  #color scheme similar to quali heatmap: 'lighttealblue', for +/- changes: 'redblue'
+            scale=alt.Scale(scheme='lightmulti', domain=(0.7, 0), clamp=True, type='linear'),  #color scheme similar to quali heatmap: 'lighttealblue', for +/- changes: 'redblue'
             sort='descending',
-            legend=alt.Legend(format='%', title=['Loss', '[%]'], gradientLength=300, orient='left', titlePadding=20)),  # , gradientLabelOffset=10)),
+            legend=alt.Legend(format='%', title=['Loss'], gradientLength=300, orient='left', titlePadding=20)),  # , gradientLabelOffset=10)),
         tooltip=alt.Tooltip(['wafer', 'pre_count', 'post_count', 'matched_count', 'particle_loss', 'BDI']),
     ).properties(
         title='Particle Numbers'
     )
 
-    signis = alt.Chart(waf).mark_point(filled=True, color='black', shape='cross').encode(
+    countSignis = alt.Chart(waf).mark_point(filled=True, color='black', size=70, shape=asterisk).encode(
         alt.X('treatment:N', sort=['water', 'H2O2', 'KOH', 'Pentane', 'SPT', 'HCl'],
               axis=alt.Axis(title=None, orient="top", domain=False)),
         alt.Y('polymer:N', sort=['ABS', 'EVA', 'LDPE', 'PA6', 'PC', 'PET', 'PMMA', 'PP', 'PS', 'PVC', 'TPU', 'Acrylate', 'Epoxy'],
               axis=alt.Axis(title=None, orient="left", domain=False)),
         opacity=alt.condition((alt.datum.pre_count >= Nselector.Ncutoff) & (alt.datum.BDI <= BDIselector.BDIcutoff), alt.value(1), alt.value(0))
     ).transform_filter(
-        alt.datum.count_signiFi <= 0.01
+        # alt.datum.count_signiFi <= 0.05
+        alt.datum.particle_loss > alt.datum.upperPredIntv_confounder_caused_particle_loss
     ).transform_filter(
         modeSelector
+    ).transform_filter(
+        ~excluder
     ).properties(
         height=350, width=240
     )
-    countHM = alt.layer(countHM, signis)
+
+    # countSignisF = alt.Chart(waf).mark_point(filled=True, color='black', shape='cross').encode(
+    #     alt.X('treatment:N', sort=['water', 'H2O2', 'KOH', 'Pentane', 'SPT', 'HCl'],
+    #           axis=alt.Axis(title=None, orient="top", domain=False)),
+    #     alt.Y('polymer:N',
+    #           sort=['ABS', 'EVA', 'LDPE', 'PA6', 'PC', 'PET', 'PMMA', 'PP', 'PS', 'PVC', 'TPU', 'Acrylate', 'Epoxy'],
+    #           axis=alt.Axis(title=None, orient="left", domain=False)),
+    #     opacity=alt.condition((alt.datum.pre_count >= Nselector.Ncutoff) & (alt.datum.BDI <= BDIselector.BDIcutoff),
+    #                           alt.value(1), alt.value(0))
+    # ).transform_filter(
+    #     alt.datum.count_signiFi <= 0.05
+    #     # alt.datum.particle_loss > alt.datum.upperPredIntv_confounder_caused_particle_loss
+    # ).transform_filter(
+    #     modeSelector
+    # ).transform_filter(
+    #     ~excluder
+    # ).properties(
+    #     height=350, width=240
+    # )
+    countHM = alt.layer(countHM, countSignis)
 
     areaHM = quantHM.encode(
         alt.Y('polymer:N', sort=['ABS', 'EVA', 'LDPE', 'PA6', 'PC', 'PET', 'PMMA', 'PP', 'PS', 'PVC', 'TPU', 'Acrylate', 'Epoxy'], axis=alt.Axis(format='%', title=None, orient="left", domain=False, labels=False, ticks=False)),
         color=alt.Color(
             'area_change:Q',
-            scale=alt.Scale(scheme='redblue', domain=(-1, 1), clamp=True),  #color scheme similar to quali heatmap: 'lighttealblue', for +/- changes: 'redblue'
-            legend=alt.Legend(format='%', title=['Change', '+/- [%]'], gradientLength=300, orient='right', titlePadding=20)),  # , gradientLabelOffset=10)),
+            scale=alt.Scale(scheme='redblue', domain=(-0.6, 0.6), clamp=True),  #color scheme similar to quali heatmap: 'lighttealblue', for +/- changes: 'redblue'
+            legend=alt.Legend(format='%', title=['Change'], gradientLength=300, orient='right', titlePadding=20)),  # , gradientLabelOffset=10)),
         tooltip=alt.Tooltip(['wafer', 'pre_area_matched', 'post_area_matched', 'area_change', 'BDI'])
     ).properties(
         title='Particle Areas'
     )
+
+    areaSignis = alt.Chart(waf).mark_point(filled=True, color='black', size=70, shape=asterisk).encode(
+        alt.X('treatment:N', sort=['water', 'H2O2', 'KOH', 'Pentane', 'SPT', 'HCl'],
+              axis=alt.Axis(title=None, orient="top", domain=False)),
+        alt.Y('polymer:N',
+              sort=['ABS', 'EVA', 'LDPE', 'PA6', 'PC', 'PET', 'PMMA', 'PP', 'PS', 'PVC', 'TPU', 'Acrylate', 'Epoxy'],
+              axis=alt.Axis(title=None, orient="left", domain=False)),
+        opacity=alt.condition((alt.datum.pre_count >= Nselector.Ncutoff) & (alt.datum.BDI <= BDIselector.BDIcutoff),
+                              alt.value(1), alt.value(0))
+    ).transform_filter(
+        {'or': [alt.datum.area_change > alt.datum.upperPredIntv_confounder_caused_area_change,
+                alt.datum.area_change < alt.datum.lowerPredIntv_confounder_caused_area_change]}
+    ).transform_filter(
+        modeSelector
+    ).transform_filter(
+        ~excluder
+    ).properties(
+        height=350, width=240
+    )
+
+    areaHM = alt.layer(areaHM, areaSignis)
 
     # tileFrame = quantHM.encode(
     #     alt.X('treatment:N', sort=['water', 'H2O2', 'KOH', 'Pentane', 'SPT', 'HCl'], axis=alt.Axis(title=None, orient="top", domain=False), scale=alt.ScaleConfig(bandPaddingInner=0)),

@@ -29,7 +29,7 @@ def glmControlPlots(fitted_model, y, yAll, yhat, yhatAll, line_fit, meanRespAll,
     # df.sort_values(by='yhatAll', inplace=True)
 
     ivs_sorted = np.column_stack(
-        [yhatAll.T, iv_uAll.T, iv_lAll.T, yAll.T, meanRespAll.T])  # combine fitted losses with predict ints for sorting
+        [yhatAll.T, iv_uAll.T, iv_lAll.T, yAll.T, meanRespAll.T, rrivU, rrivL])  # combine fitted losses with predict ints for sorting
     ivs_sorteds = np.column_stack(
         [yhat.T, iv_u.T, iv_l.T])  # also show original (non-extrapolated) upper pred interval for comparison
     ivs_sorted = ivs_sorted[
@@ -42,24 +42,26 @@ def glmControlPlots(fitted_model, y, yAll, yhat, yhatAll, line_fit, meanRespAll,
     ax[0, 0].plot(ivs_sorteds[:, 0], ivs_sorteds[:, 1], color='red')
     ax[0, 0].plot(ivs_sorted[:, 0], ivs_sorted[:, 2], color='lightgray', linestyle='dashed')  # plot lower predict int
     ax[0, 0].plot(ivs_sorteds[:, 0], ivs_sorteds[:, 2], color='red')
-    abline_plot(model_results=line_fit, ax=ax[0, 0])  # plot linear regression line
-    ax[0, 0].scatter(yhatAll, meanRespAll, s=20, color='black')
-    ax[0, 0].scatter(yhat, line_fit.predict(sm.add_constant(yhat)), s=20, color='red', zorder=8)
+    abline_plot(model_results=line_fit, ax=ax[0, 0], color='black')  # plot linear regression line
+    # ax[0, 0].scatter(yhatAll, meanRespAll, s=20, color='black')
+    # ax[0, 0].scatter(yhat, line_fit.predict(sm.add_constant(yhat)), s=20, color='red', zorder=8)
     # ax[0, 0].bar(ivs_sorted[:, 0], rr, bottom=meanRespAll, color='black', width=0.002)
     ax[0, 0].scatter(yhatAll, yAll, s=50)  # plot all original loss values against predicted loss values
-    ax[0, 0].scatter(yhat, y)  # plot water point in different color on top
+    ax[0, 0].scatter(yhat, y, s=10)  # plot water point in different color on top
     ax[0, 0].set_xlabel('fitted relative changes (attributed to n and image quality)')
-    ax[0, 0].set_ylabel('observed relative changes')
+    ax[0, 0].set_ylabel('observed relative changes (blue dots, water with orange kernel)')
     ax[0, 0].set_title('Linearized model')
     ax[0, 0].set_ylim(yAll.min() - (yAll.max()-yAll.min()) * 0.1, yAll.max() + (yAll.max()-yAll.min()) * 0.1)
     ax[0, 0].set_xlim(yhatAll.min() - (yhatAll.max()-yhatAll.min()) * 0.1, yhatAll.max() + (yhatAll.max()-yhatAll.min()) * 0.1)
 
     ax[0, 1].scatter(yhat, rp, s=50, color='C2')
     # ax[0, 1].scatter(meanRespAll, rr, s=50, color='C2')
-    # ax[0, 1].scatter(np.arange(1, len(yAll) + 1, 1), rr, s=50, color='C2')
+    # ax[0, 1].scatter(ivs_sorted[:, 0], rr, s=50, color='C2')
+    # ax[0, 1].plot(ivs_sorted[:, 0], ivs_sorted[:, 5], color='black')
+    # ax[0, 1].scatter(np.arange(1, len(yAll) + 1, 1), iv_lAll, s=50, color='black')
     # ax[0, 1].bar(yhatAll, rr, color='C2', width=0.01)
     # ax[0, 1].bar(meanRespAll, rr, color='C2', width=0.005)
-    # ax[0, 1].bar(np.arange(1, len(yAll) + 1, 1), rr, color='C2')
+    # ax[0, 1].bar(ivs_sorted[:, 0], rr, color='C2', width=0.006)
     ax[0, 1].hlines(0, min(yhat), max(yhat))
     # ax[0, 1].hlines(0, 0, len(yAll))
     ax[0, 1].set_xlabel('fitted values')
@@ -69,19 +71,21 @@ def glmControlPlots(fitted_model, y, yAll, yhat, yhatAll, line_fit, meanRespAll,
     ax[0, 1].set_title('Residual Dependence Plot')
 
     ax[1, 0].scatter(np.arange(1, len(yAll) + 1, 1), ivs_sorted[:, 3])
-    ax[1, 0].scatter(np.arange(1, len(yAll) + 1, 1), ivs_sorted[:, 0])
+    ax[1, 0].scatter(np.arange(1, len(yAll) + 1, 1), ivs_sorted[:, 0], s=20, color='grey')
     ax[1, 0].plot(np.arange(1, len(yAll) + 1, 1), ivs_sorted[:, 4], color='black')
-    ax[1, 0].set_xlabel('id')
+    # ax[1, 0].set_xlabel('id')
+    ax[1, 0].axes.xaxis.set_visible(False)
     ax[1, 0].set_ylabel('observed and fitted relative changes')
     ax[1, 0].set_title(
-        "\n".join(wrap('Original relative change (blue) and change attributed to n and image quality (orange)', 80)))
+        "\n".join(wrap('Original relative change (blue) and change attributed to n and image quality (i.e. fitted values, grey), Black line shows the fitted mean', 80)))
 
     ax[1, 1].bar(np.arange(1, len(yAll) + 1, 1), yAll)  # , width=0.2)
     # ax[1, 1].bar(np.arange(1, len(yAll) + 1, 1), rr, color='C2')  # , width=0.2)
     ax[1, 1].scatter(np.arange(1, len(yAll) + 1, 1), rr, color='black', zorder=4)
     ax[1, 1].bar(np.arange(1, len(yAll) + 1, 1), -yhatAll, bottom=yAll, color='C1', alpha=0.5)  # , width=0.2)
-    # ax[1, 1].set_ylim(0, 1)
-    ax[1, 1].set_xlabel('id')
+    ax[1, 1].set_ylim(0, np.max([1, max(yAll)]))
+    # ax[1, 1].set_xlabel('id')
+    ax[1, 1].axes.xaxis.set_visible(False)
     ax[1, 1].set_ylabel('relative changes')
     ax[1, 1].set_title("\n".join(wrap(
         'Relative changes: original (tops), attributed to n and image quality (upper bar) and attributed to treatment effects (bottom bar)',
@@ -159,11 +163,11 @@ def glm_residuals(fitted_model, endog, yAll, yhatAll):
     iv_lAll = extrap(yhatAll, yhat, iv_l, ord=3)  # get lower pred interval for all point by interpolation / extrapolation
     iv_uAll = extrap(yhatAll, yhat, iv_u, ord=3)  # get upper pred interval for all point by interpolation / extrapolation
 
+    rrivU = iv_uAll - yhatAll  # residual response upper prediction interval
+    # rrivU = iv_uAll - meanRespAll  # residual response upper prediction interval
+    rrivL = iv_lAll - yhatAll  # residual response lower prediction interval
+    # rrivL = iv_lAll - meanRespAll  # residual response lower prediction interval
     if settings.Config.useGLMpredIv:
-        rrivU = iv_uAll - yhatAll  # residual response upper prediction interval
-        # rrivU = iv_uAll - meanRespAll  # residual response upper prediction interval
-        rrivL = iv_lAll - yhatAll  # residual response lower prediction interval
-        # rrivL = iv_lAll - meanRespAll  # residual response lower prediction interval
         rr[(rr <= rrivU) & (rr >= rrivL)] = 0
         rr[rr > rrivU] = rr[rr > rrivU] - rrivU[rr > rrivU]
         rr[rr < rrivL] = rr[rr < rrivL] - rrivL[rr < rrivL]
@@ -180,10 +184,10 @@ def glm_residuals(fitted_model, endog, yAll, yhatAll):
 
     if settings.Config.glmPlots and not settings.Config.glmPredictorTesting:
         glmControlPlots(fitted_model, y, yAll, yhat, yhatAll, line_fit, meanRespAll, rr, rp, iv_u, iv_l, iv_uAll, iv_lAll,
-                        rrivU if settings.Config.useGLMpredIv else None,
-                        rrivL if settings.Config.useGLMpredIv else None)
+                        rrivU,  # if settings.Config.useGLMpredIv else None,
+                        rrivL)  # if settings.Config.useGLMpredIv else None)
 
-    return rr, iv_uAll, iv_lAll, chichi
+    return rr, rrivU, rrivL, chichi
 
 
 def glm_from_arrays(df4glm, originalDF):
@@ -217,10 +221,15 @@ def glm_from_df(wafer_results):
     df4glmAll = prepare_df4glm(wafer_results)
     df4glm = df4glmAll.loc[df4glmAll.treatment == 'water'] if settings.Config.glmOnTheWater else df4glmAll
     endog = np.asarray(df4glm.particle_loss)  # = np.asarray(1 - df4glm['success'] / (df4glm['success'] + df4glm['failure']))
-    formula = f'failure + success ~ {settings.Ndict[0]} + ' \
-              f'{settings.BDIdict[5]}  ' \
-            #  f'{settings.BDIdict[6]}'
-    glm_binom = smf.glm(formula=formula, data=df4glm,
+    # formula = f'failure + success ~ {settings.Ndict[0]} + ' \
+    #           f'{settings.BDIdict[4]}  ' \
+    #          # f'{settings.BDIdict[6]}'
+
+    # formula = f'failure + success ~ {settings.Config.glmNpredictor} + ' \
+    #           f'{settings.Config.glmImgQualiPredictors[0]} + ' \
+    #           f'{settings.Config.glmImgQualiPredictors[1]}'  # with "-1" in the end to run without constant term
+
+    glm_binom = smf.glm(formula=settings.Config.countGLMformula, data=df4glm,
                         family=sm.families.Binomial()).fit()
     # yhatAll = np.asarray(1 / (1 + np.exp(
     #     (glm_binom.params[1] * wafer_results[settings.Config.glmNpredictor] + \
@@ -229,10 +238,10 @@ def glm_from_df(wafer_results):
     #      glm_binom.params[0] + \
     #      0))))  # get fitted losses for all wafers
     yhatAll = np.asarray(glm_binom.predict(wafer_results))  # alternative to the manual way above
-    glm_corrected_particle_losses, iv_uAll, iv_lAll, chichi = glm_residuals(glm_binom, endog, endogAll, yhatAll)
+    glm_corrected_particle_losses, rrivU, rrivL, chichi = glm_residuals(glm_binom, endog, endogAll, yhatAll)
 
     paramsReport(glm_binom, chichi)
-    return glm_corrected_particle_losses, yhatAll, iv_uAll, iv_lAll, glm_binom
+    return glm_corrected_particle_losses, yhatAll, rrivU, rrivL, glm_binom
 
 
 def count_loss_glm(wafer_results):
@@ -244,7 +253,7 @@ def count_loss_glm(wafer_results):
         particle_losses_by_predictors, \
         particle_losses_by_predictors_upperInterval, \
         particle_losses_by_predictors_lowerInterval, \
-        glm_binom =\
+        glm_binom = \
             glm_from_df(wafer_results)
     else:
         glm_corrected_particle_losses, \
@@ -253,7 +262,6 @@ def count_loss_glm(wafer_results):
         particle_losses_by_predictors_lowerInterval, \
         glm_binom = \
             glm_from_arrays(df4glm, wafer_results)
-
 
     glm_corrected_particle_losses_df = pd.DataFrame._from_arrays([glm_corrected_particle_losses,
                                                                   particle_losses_by_predictors,
@@ -267,16 +275,18 @@ def count_loss_glm(wafer_results):
 
     if not settings.Config.manualBDI:
         glm_corrected_particle_losses_df['BDI'] = round(1 / (1 + np.exp((
-                glm_binom.params[-2] * wafer_results[settings.Config.glmImgQualiPredictors[0]] +\
-                glm_binom.params[-1] * wafer_results[settings.Config.glmImgQualiPredictors[1]]))), 3)
+                glm_binom.params[-2] * wafer_results[settings.Config.glmImgQualiPredictors[0]]
+            # +  glm_binom.params[-1] * wafer_results[settings.Config.glmImgQualiPredictors[1]]
+        ))), 3)
         if glm_corrected_particle_losses_df['BDI'].max() < 0:
-            glm_corrected_particle_losses_df['BDI'] = glm_corrected_particle_losses_df['BDI'] * -1  # convert to positive BDI range
-        glm_corrected_particle_losses_df['IQI'] = glm_corrected_particle_losses_df['BDI'].max() -\
+            glm_corrected_particle_losses_df['BDI'] -= glm_corrected_particle_losses_df['BDI'].min()  # convert to positive BDI range
+        glm_corrected_particle_losses_df['IQI'] = glm_corrected_particle_losses_df['BDI'].max() - \
                                                   glm_corrected_particle_losses_df['BDI']
 
     reduction = abs(glm_corrected_particle_losses_df.particle_loss_glm_corrected).sum() / abs(wafer_results.particle_loss).sum() - 1
     settings.reports.GLMparams.loc[settings.reports.GLMparams.index[-1], 'reduction'] = reduction
     # plt.gcf().text(0.65, 0.08, f'Reduction:   {reduction}', fontsize=16)
+    print(f'Reduction:   {reduction}')
     try:
         wafer_results = pd.concat([wafer_results, glm_corrected_particle_losses_df], axis=1, verify_integrity=True)
     except ValueError:
@@ -294,13 +304,16 @@ def area_change_glm(wafer_results, pam):
         ww = wafer_results_AbsChange.loc[wafer_results_AbsChange.treatment == 'water'] if \
             settings.Config.glmOnTheWater else wafer_results_AbsChange  # get water wafers
 
-        formula = f'area_change ~ {settings.Config.glmNpredictor} + ' \
-                  f'{settings.Config.glmImgQualiPredictors[1]}'  \
-                  # f'{settings.Config.glmImgQualiPredictors[1]}'  # with "-1" in the end to run without constant term
+        # formula = f'area_change ~ {settings.Ndict[0]} + ' \
+        #           f'{settings.BDIdict[8]} ' \
+        #           # f'{settings.BDIdict[2]}'  # with "-1" in the end to run without constant term
 
+        # formula = f'area_change ~ {settings.Config.glmNpredictor} + ' \
+        #           f'{settings.Config.glmImgQualiPredictors[0]} + ' \
+        #           f'{settings.Config.glmImgQualiPredictors[1]}'  # with "-1" in the end to run without constant term
 
         link_g = sm.genmod.families.links.identity
-        glm_gauss = smf.glm(formula=formula, data=ww, family=sm.families.Gamma(link_g()))
+        glm_gauss = smf.glm(formula=settings.Config.areaGLMformula, data=ww, family=sm.families.Gamma(link_g()))
         fitted_gauss = glm_gauss.fit()
 
         yAll = np.asarray(wafer_results_AbsChange['area_change'])
@@ -336,6 +349,7 @@ def area_change_glm(wafer_results, pam):
         reduction = abs(gc_ac.area_change_glm_corrected).sum() / abs(wafer_results.area_change).sum() - 1
         settings.reports.GLMparams.loc[settings.reports.GLMparams.index[-1], 'reduction'] = reduction
         # plt.gcf().text(0.65, 0.08, f'Reduction:   {reduction}', fontsize=16)
+        print(f'Reduction:   {reduction}')
     return wafer_results
 
 

@@ -56,7 +56,7 @@ def runParticleMatching(pathBeforeImg, pathAfterImg):
     beforeMax, afterMax = getBeforeAfterMax(beforeImg_nonBlur, afterImg_nonBlur, beforeLowerTH, afterLowerTH)
 
     beforeRadii: List[float] = getContourRadii(beforeContours)
-    errorsPerParticle: List[float] = [rad*4 for rad in beforeRadii]
+    errorsPerParticle: List[float] = [rad*6 for rad in beforeRadii]
     angle, shift = findAngleAndShift(beforeCenters, afterCenters, errorsPerParticle)
 
     # # Now get only the relevant particles

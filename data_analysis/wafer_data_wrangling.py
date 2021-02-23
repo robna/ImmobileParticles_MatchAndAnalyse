@@ -92,10 +92,20 @@ def semiMelting(wafer_results_wrangled):
 
 
 def meltHelper(df, value_name):
-    dfMelt = df.melt(id_vars=['wafer', 'polymer', 'treatment', 'pre_count', 'post_count',
-                              'pre_area_matched', 'BDI'],
+    dfMelt = df.melt(id_vars=['wafer', 'polymer', 'treatment', 'pre_count', 'post_count', 'pre_area_matched', 'BDI',
+                              'upperPredIntv_confounder_caused_particle_loss',
+                              'lowerPredIntv_confounder_caused_particle_loss',
+                              'upperPredIntv_confounder_caused_area_change',
+                              'lowerPredIntv_confounder_caused_area_change'
+                              ],
                     value_vars=['non_corrected', 'glm_corrected', 'water_corrected', 'glm_and_water_corrected'],
                     var_name='mode', value_name=value_name)
+    dfMelt.loc[dfMelt['mode'].isin(['non_corrected', 'water_corrected']),
+               ['upperPredIntv_confounder_caused_particle_loss',
+                'upperPredIntv_confounder_caused_area_change']] = 1000000  # set some high value to not sho pi comparison on uncorrected data
+    dfMelt.loc[dfMelt['mode'].isin(['non_corrected', 'water_corrected']),
+               ['lowerPredIntv_confounder_caused_particle_loss',
+                'lowerPredIntv_confounder_caused_area_change']] = -1000000
     return dfMelt
 
 
@@ -114,8 +124,12 @@ def doubleMelting(wr):
         named = nameHelper(wr, att=meltee)
         nowMelt = meltHelper(named, value_name=meltee)
         if meltee != 'particle_loss':
-            nowMelt.drop(columns=['wafer', 'polymer', 'treatment', 'pre_count', 'post_count',
-                                  'pre_area_matched', 'BDI', 'mode'], inplace=True)
+            nowMelt.drop(columns=['wafer', 'polymer', 'treatment', 'pre_count', 'post_count', 'pre_area_matched', 'BDI',
+                                  'upperPredIntv_confounder_caused_particle_loss',
+                                  'lowerPredIntv_confounder_caused_particle_loss',
+                                  'upperPredIntv_confounder_caused_area_change',
+                                  'lowerPredIntv_confounder_caused_area_change',
+                                  'mode'], inplace=True)
         doubleMelt = pd.concat([doubleMelt, nowMelt], axis=1)
     return doubleMelt
 
