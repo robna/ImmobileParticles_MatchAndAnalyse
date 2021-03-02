@@ -57,7 +57,7 @@ def identify_particles(img: np.ndarray, parameters: 'RecognitionParameters' = Re
                 masked[masked < high] = 0
                 numPxHigh = cv2.countNonZero(masked)
 
-                if numPxHigh / numPxLabel > 0.1:
+                if numPxHigh / numPxLabel > 0.1:  # TODO: wouldn't it be better to have the HT percentage in the Config?
                     connected_to_high[i] = True
 
         hyst = connected_to_high[labels_low]
