@@ -3,7 +3,7 @@
 In this repository we analyse pairs of microscopic images containing bright particles on dark background.
 The code was created for a study developing an evaluation concept for microplastic purification protocols.
 
-**The original publication can be found here: [...soon]()**
+**The original publication can be found here: [Measuring impacts of microplastic treatments via image recognition on immobilised particles below 100 μm. Micropl.&Nanopl. 1, 12 (2021)](https://doi.org/10.1186/s43591-021-00012-0)**
 
 ## The concept in a nutshell
 Microplastic particles are immobilised on a plane silicon wafer substrate using a micrometre thin spin coated layer of epoxy resin.
